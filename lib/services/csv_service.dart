@@ -1,14 +1,17 @@
 import 'dart:io';
 import 'package:csv/csv.dart';
-import 'package:file_selector/file_selector.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/activity.dart';
 
 class CsvService {
   Future<List<Activity>> pickAndParseCsv() async {
-    final typeGroup = XTypeGroup(label: 'CSV', extensions: ['csv']);
-    final file = await openFile(acceptedTypeGroups: [typeGroup]);
-    if (file == null) return [];
-    final content = await file.readAsString();
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+    );
+    if (result == null || result.files.single.path == null) return [];
+    final filePath = result.files.single.path!;
+    final content = await File(filePath).readAsString();
     final rows = const CsvToListConverter(eol: '\n', shouldParseNumbers: false).convert(content, eol: '\n');
     if (rows.isEmpty) return [];
     final header = rows.first.cast<String>();

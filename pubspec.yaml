@@ -37,7 +37,7 @@ dependencies:
   provider: ^6.1.1
   csv: ^5.1.1
   shared_preferences: ^2.2.2
-  file_selector: ^1.0.3
+  file_picker: ^10.2.0
   intl: ^0.18.1
   fl_chart: ^0.66.0
 
