@@ -13,7 +13,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static const List<Widget> _tabs = <Widget>[
     StreakScreen(),
-    Center(child: Text('Map (coming soon)')),
+    Center(child: Text('Map (feature not available)')),
     Center(child: Text('Insights (coming soon)')),
   ];
 
