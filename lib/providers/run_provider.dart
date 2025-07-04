@@ -98,17 +98,28 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- New Streak and Stats Logic ---
-  // Helper: Get sorted runs (descending by date)
-  List<Run> get _sortedRuns {
-    final r = runs;
-    r.sort((a, b) => b.date.compareTo(a.date));
-    return r;
+  // Helper: Get runs with at least 1.61 km per day (for streak logic)
+  List<Run> get _qualifiedRuns {
+    // Group by date, sum distances per day, and only include days with >= 1.61 km
+    final byDate = <DateTime, double>{};
+    for (final run in runs) {
+      final day = DateTime(run.date.year, run.date.month, run.date.day);
+      byDate[day] = (byDate[day] ?? 0) + run.distanceKm;
+    }
+    return byDate.entries
+      .where((e) => e.value >= 1.61)
+      .map((e) => Run(date: e.key, distanceKm: e.value, lat: 0, lon: 0))
+      .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
   }
+
+  // --- New Streak and Stats Logic ---
+  // Helper: Get sorted qualified runs (descending by date)
+  List<Run> get _sortedQualifiedRuns => _qualifiedRuns;
 
   // Current streak (consecutive days up to most recent)
   int get currentStreak {
-    final r = _sortedRuns;
+    final r = _sortedQualifiedRuns;
     if (r.isEmpty) return 0;
     int streak = 1;
     for (int i = 1; i < r.length; i++) {
@@ -124,7 +135,7 @@ class RunProvider extends ChangeNotifier {
 
   // Longest streak (anywhere in the data)
   int get longestStreak {
-    final r = _sortedRuns;
+    final r = _sortedQualifiedRuns;
     if (r.isEmpty) return 0;
     int maxStreak = 1;
     int streak = 1;
@@ -142,7 +153,7 @@ class RunProvider extends ChangeNotifier {
 
   // Current streak stats
   List<Run> get currentStreakRuns {
-    final r = _sortedRuns;
+    final r = _sortedQualifiedRuns;
     if (r.isEmpty) return [];
     List<Run> streakRuns = [r.first];
     for (int i = 1; i < r.length; i++) {
@@ -159,8 +170,61 @@ class RunProvider extends ChangeNotifier {
   double get currentStreakTotalKm => currentStreakRuns.fold(0.0, (sum, r) => sum + r.distanceKm);
   double get currentStreakAvgKm => currentStreakRuns.isEmpty ? 0.0 : currentStreakTotalKm / currentStreakRuns.length;
   DateTime? get currentStreakFirstDay => currentStreakRuns.isEmpty ? null : currentStreakRuns.last.date;
+  DateTime? get currentStreakLastDay => currentStreakRuns.isEmpty ? null : currentStreakRuns.first.date;
 
-  // All-time stats
+  // All-time stats (still use all runs)
   double get allTimeTotalKm => runs.fold(0.0, (sum, r) => sum + r.distanceKm);
   double get allTimeAvgKm => runs.isEmpty ? 0.0 : allTimeTotalKm / runs.length;
+
+  DateTime? get longestStreakFirstDay {
+    final runs = _sortedQualifiedRuns;
+    if (runs.isEmpty) return null;
+    int maxStreak = 1, streak = 1, maxStart = 0, maxEnd = 0, start = 0;
+    for (int i = 1; i < runs.length; i++) {
+      final diff = runs[i - 1].date.difference(runs[i].date).inDays;
+      if (diff == 1) {
+        streak++;
+      } else {
+        if (streak > maxStreak) {
+          maxStreak = streak;
+          maxStart = start;
+          maxEnd = i - 1;
+        }
+        streak = 1;
+        start = i;
+      }
+    }
+    if (streak > maxStreak) {
+      maxStreak = streak;
+      maxStart = start;
+      maxEnd = runs.length - 1;
+    }
+    return runs[maxEnd].date;
+  }
+
+  DateTime? get longestStreakLastDay {
+    final runs = _sortedQualifiedRuns;
+    if (runs.isEmpty) return null;
+    int maxStreak = 1, streak = 1, maxStart = 0, maxEnd = 0, start = 0;
+    for (int i = 1; i < runs.length; i++) {
+      final diff = runs[i - 1].date.difference(runs[i].date).inDays;
+      if (diff == 1) {
+        streak++;
+      } else {
+        if (streak > maxStreak) {
+          maxStreak = streak;
+          maxStart = start;
+          maxEnd = i - 1;
+        }
+        streak = 1;
+        start = i;
+      }
+    }
+    if (streak > maxStreak) {
+      maxStreak = streak;
+      maxStart = start;
+      maxEnd = runs.length - 1;
+    }
+    return runs[maxStart].date;
+  }
 } 

@@ -17,20 +17,31 @@ class StreakScreen extends StatelessWidget {
     final currentStreakAvgKm = runProvider.currentStreakAvgKm;
     final allTimeTotalKm = runProvider.allTimeTotalKm;
     final allTimeAvgKm = runProvider.allTimeAvgKm;
-    final years = currentStreak ~/ 365;
+    final years = currentStreak / 365;
+    final currentStreakFirstDay = runProvider.currentStreakFirstDay;
+    final currentStreakLastDay = runProvider.currentStreakLastDay;
+    final longestStreakFirstDay = runProvider.longestStreakFirstDay;
+    final longestStreakLastDay = runProvider.longestStreakLastDay;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Current Streak: $currentStreak days${years > 0 ? ' ($years years)' : ''}', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Current Streak: $currentStreak days${currentStreak > 0 ? ' (' + years.toStringAsFixed(1) + ' years)' : ''}',
+            style: Theme.of(context).textTheme.headlineSmall),
+          Text('Current streak period: '
+            + (currentStreakFirstDay != null && currentStreakLastDay != null
+                ? '${DateFormat.yMMMd().format(currentStreakFirstDay)} - ${DateFormat.yMMMd().format(currentStreakLastDay)}'
+                : '-')),
           Text('Current Streak Total km: ${currentStreakTotalKm.toStringAsFixed(2)}'),
           Text('Current Streak Avg km/day: ${currentStreakAvgKm.toStringAsFixed(2)}'),
-          Text('First day of current streak: ${firstDay != null ? DateFormat.yMMMd().format(firstDay) : "-"}'),
           const SizedBox(height: 16),
           Text('All Time Total km: ${allTimeTotalKm.toStringAsFixed(2)}'),
           Text('All Time Avg km/activity: ${allTimeAvgKm.toStringAsFixed(2)}'),
-          Text('Longest Streak: $longestStreak days'),
+          Text('Longest Streak: $longestStreak days'
+            + (longestStreakFirstDay != null && longestStreakLastDay != null
+                ? ' (${DateFormat.yMMMd().format(longestStreakFirstDay)} - ${DateFormat.yMMMd().format(longestStreakLastDay)})'
+                : '')),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () => runProvider.importCsv(),
