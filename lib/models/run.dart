@@ -6,9 +6,15 @@ class Run {
   const Run({required this.date, required this.distanceKm, required this.lat, required this.lon});
 
   factory Run.fromCsv(Map<String, String> row) {
-    final date = DateTime.parse(row['Date']!.split(' ').first);
-    final distanceKm = double.tryParse(row['Distance'] ?? '') ?? 0.0;
-    return Run(date: date, distanceKm: distanceKm, lat: 0, lon: 0);
+    try {
+      // Parse full date and time string
+      final date = DateTime.parse(row['Date']!);
+      final distanceKm = double.tryParse(row['Distance'] ?? '') ?? 0.0;
+      return Run(date: date, distanceKm: distanceKm, lat: 0, lon: 0);
+    } catch (e) {
+      print('Failed to parse Run from row: $row, error: $e');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() => {

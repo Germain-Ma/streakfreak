@@ -9,18 +9,41 @@ class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
   final StorageService _storageService = StorageService();
   List<Activity> _activities = [];
+  static int runsGetterCallCount = 0;
 
   List<Activity> get activities => _activities;
 
   List<Run> get runs {
-    // Try to extract Run from each Activity (if possible)
-    return _activities.map((a) {
+    runsGetterCallCount++;
+    if (runsGetterCallCount == 1) {
+      print('Total activities: ' + _activities.length.toString());
+      final validRuns = _activities.map((a) {
+        try {
+          final type = (a.fields['Activity Type'] ?? '').toLowerCase();
+          if (!type.contains('run')) return null;
+          return Run.fromCsv(a.fields);
+        } catch (e) {
+          print('Skipped activity: $a, error: $e');
+          return null;
+        }
+      }).whereType<Run>().toList();
+      print('Parsed runs: ' + validRuns.length.toString());
+      return validRuns;
+    } else if (runsGetterCallCount == 2) {
+      print('runs getter called 2 times');
+    } else if (runsGetterCallCount % 10 == 0) {
+      print('runs getter called $runsGetterCallCount times');
+    }
+    final validRuns = _activities.map((a) {
       try {
+        final type = (a.fields['Activity Type'] ?? '').toLowerCase();
+        if (!type.contains('run')) return null;
         return Run.fromCsv(a.fields);
-      } catch (_) {
+      } catch (e) {
         return null;
       }
     }).whereType<Run>().toList();
+    return validRuns;
   }
 
   // Computed stats
@@ -56,6 +79,7 @@ class RunProvider extends ChangeNotifier {
 
   Future<void> importCsv() async {
     final newActivities = await _csvService.pickAndParseCsv();
+    print('importCsv: loaded [0m' + newActivities.length.toString() + ' activities');
     if (newActivities.isNotEmpty) {
       _activities = newActivities;
       // Optionally, persist activities as JSON if you want full data persistence
@@ -73,4 +97,70 @@ class RunProvider extends ChangeNotifier {
     await _storageService.clearActivities();
     notifyListeners();
   }
+
+  // --- New Streak and Stats Logic ---
+  // Helper: Get sorted runs (descending by date)
+  List<Run> get _sortedRuns {
+    final r = runs;
+    r.sort((a, b) => b.date.compareTo(a.date));
+    return r;
+  }
+
+  // Current streak (consecutive days up to most recent)
+  int get currentStreak {
+    final r = _sortedRuns;
+    if (r.isEmpty) return 0;
+    int streak = 1;
+    for (int i = 1; i < r.length; i++) {
+      final diff = r[i - 1].date.difference(r[i].date).inDays;
+      if (diff == 1) {
+        streak++;
+      } else if (diff > 1) {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  // Longest streak (anywhere in the data)
+  int get longestStreak {
+    final r = _sortedRuns;
+    if (r.isEmpty) return 0;
+    int maxStreak = 1;
+    int streak = 1;
+    for (int i = 1; i < r.length; i++) {
+      final diff = r[i - 1].date.difference(r[i].date).inDays;
+      if (diff == 1) {
+        streak++;
+        if (streak > maxStreak) maxStreak = streak;
+      } else if (diff > 1) {
+        streak = 1;
+      }
+    }
+    return maxStreak;
+  }
+
+  // Current streak stats
+  List<Run> get currentStreakRuns {
+    final r = _sortedRuns;
+    if (r.isEmpty) return [];
+    List<Run> streakRuns = [r.first];
+    for (int i = 1; i < r.length; i++) {
+      final diff = r[i - 1].date.difference(r[i].date).inDays;
+      if (diff == 1) {
+        streakRuns.add(r[i]);
+      } else if (diff > 1) {
+        break;
+      }
+    }
+    return streakRuns;
+  }
+
+  double get currentStreakTotalKm => currentStreakRuns.fold(0.0, (sum, r) => sum + r.distanceKm);
+  double get currentStreakAvgKm => currentStreakRuns.isEmpty ? 0.0 : currentStreakTotalKm / currentStreakRuns.length;
+  DateTime? get currentStreakFirstDay => currentStreakRuns.isEmpty ? null : currentStreakRuns.last.date;
+
+  // All-time stats
+  double get allTimeTotalKm => runs.fold(0.0, (sum, r) => sum + r.distanceKm);
+  double get allTimeAvgKm => runs.isEmpty ? 0.0 : allTimeTotalKm / runs.length;
 } 
