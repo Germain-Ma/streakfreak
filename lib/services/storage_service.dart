@@ -1,3 +1,4 @@
+// This StorageService uses shared_preferences for web compatibility. ObjectBox is not supported on Flutter web.
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/run.dart';

@@ -108,7 +108,7 @@ class RunProvider extends ChangeNotifier {
     }
     return byDate.entries
       .where((e) => e.value >= 1.61)
-      .map((e) => Run(date: e.key, distanceKm: e.value, lat: 0, lon: 0))
+      .map<Run>((e) => Run(date: e.key, distanceKm: e.value, lat: 0, lon: 0, title: ''))
       .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
   }

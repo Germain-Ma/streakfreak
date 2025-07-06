@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/run_provider.dart';
 import 'package:intl/intl.dart';
+import '../providers/location_provider.dart';
 
 class StreakScreen extends StatelessWidget {
   const StreakScreen({super.key});
@@ -44,7 +45,12 @@ class StreakScreen extends StatelessWidget {
                 : '')),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () => runProvider.importCsv(),
+            onPressed: () async {
+              await runProvider.importCsv();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.read<LocationProvider>().refresh();
+              });
+            },
             child: const Text('Import Garmin CSV'),
           ),
         ],

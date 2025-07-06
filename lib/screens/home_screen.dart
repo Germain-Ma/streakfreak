@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'streak_screen.dart';
+import 'map_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,7 +14,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static const List<Widget> _tabs = <Widget>[
     StreakScreen(),
-    Center(child: Text('Map (feature not available)')),
+    MapScreen(),
     Center(child: Text('Insights (coming soon)')),
   ];
 

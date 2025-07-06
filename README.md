@@ -33,6 +33,10 @@ when building the macOS Runner target, follow these steps to fix it:
 - Click the **+** button and choose **New Run Script Phase**.
 - Name it: `Strip extended attributes`.
 - Drag it so to the bottom
+- Code:
+  - if [ -r "$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh" ]; then
+      "$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh" build
+    fi
 
 ### 3. Input and Output Files
 - **Input File Lists:**

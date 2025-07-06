@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/run_provider.dart';
+import 'providers/location_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/map_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +18,14 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => RunProvider()..loadRuns()),
+        ChangeNotifierProxyProvider<RunProvider, LocationProvider>(
+          create: (_) => LocationProvider(null),
+          update: (_, runProv, prev) {
+            if (prev == null) return LocationProvider(runProv);
+            prev.updateRunProvider(runProv);
+            return prev;
+          },
+        ),
       ],
       child: MaterialApp(
         title: 'StreakFreak',
