@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/run.dart';
 import '../models/activity.dart';
 import '../services/csv_service.dart';
@@ -83,9 +84,6 @@ class RunProvider extends ChangeNotifier {
   /// Import activities from Strava API
   Future<void> importFromStrava() async {
     final stravaActivities = await _stravaService.fetchActivities();
-    // Debug: print all activity types found
-    final types = stravaActivities.map((a) => a['type']).toSet();
-    print('Strava activity types found: ' + types.join(', '));
     // Only import activities of type 'Run' or 'Trail Run'
     final filteredActivities = stravaActivities.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
@@ -111,27 +109,6 @@ class RunProvider extends ChangeNotifier {
       return Activity(fields);
     }).toList();
     await _storageService.saveActivities(_activities);
-    // Debug: print all runs for June 17, 2025
-    final runsOnJune17 = _activities.map((a) => Run.fromCsv(a.fields)).where((r) =>
-      r.date.year == 2025 && r.date.month == 6 && r.date.day == 17).toList();
-    print('Runs on 2025-06-17: count=${runsOnJune17.length}');
-    for (final r in runsOnJune17) {
-      print('  - ${r.date} | ${r.distanceKm} km | lat: ${r.lat}, lon: ${r.lon} | title: ${r.title}');
-    }
-    // Print all run dates and distances for the last 30 days
-    final allRuns = _activities.map((a) => Run.fromCsv(a.fields)).toList();
-    allRuns.sort((a, b) => b.date.compareTo(a.date));
-    print('All runs in last 30 days:');
-    final cutoff = DateTime.now().subtract(Duration(days: 30));
-    for (final r in allRuns.where((r) => r.date.isAfter(cutoff))) {
-      print('  - ${r.date} | ${r.distanceKm} km');
-    }
-    // Print dates included in the current streak
-    final streakDates = currentStreakRuns.map((r) => r.date).toList();
-    print('Current streak dates:');
-    for (final d in streakDates) {
-      print('  - $d');
-    }
     notifyListeners();
   }
 
