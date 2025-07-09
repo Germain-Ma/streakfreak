@@ -43,6 +43,7 @@ dependencies:
   latlong2: ^0.9.0
   geocoding: ^2.1.1
   http: ^1.2.1
+  url_launcher: ^6.2.6
   # geocoding: ^2.1.0
   # latlong2: ^0.9.0
 

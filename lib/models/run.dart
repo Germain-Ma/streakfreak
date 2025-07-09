@@ -8,10 +8,13 @@ class Run {
 
   factory Run.fromCsv(Map<String, String> row) {
     try {
-      final date = DateTime.parse(row['Date']!);
+      // Parse ISO8601 date (Strava uses UTC, e.g. '2023-07-08T10:00:00Z')
+      final date = DateTime.parse(row['Date']!); // Always use UTC for streak logic
       final distanceKm = double.tryParse(row['Distance'] ?? '') ?? 0.0;
       final title = row['Title'] ?? '';
-      return Run(date: date, distanceKm: distanceKm, lat: 0, lon: 0, title: title);
+      final lat = double.tryParse(row['Start Latitude'] ?? '') ?? 0.0;
+      final lon = double.tryParse(row['Start Longitude'] ?? '') ?? 0.0;
+      return Run(date: date, distanceKm: distanceKm, lat: lat, lon: lon, title: title);
     } catch (e) {
       print('Failed to parse Run from row: $row, error: $e');
       rethrow;
@@ -34,21 +37,14 @@ class Run {
         title: j['t'] ?? '',
       );
 
-  /// Smart location extraction using multiple strategies
+  /// Location is now based on GPS coordinates, not title
   String get location {
-    final t = title.trim();
-    if (t.isEmpty) return '';
-    
-    // Strategy 1: Look for common location patterns
-    final location = _extractLocationSmart(t);
-    if (location.isNotEmpty) return location;
-    
-    // Strategy 2: If no clear location found, return the whole title if it's reasonable
-    if (_isLikelyLocation(t)) return t;
-    
+    if (lat != 0.0 || lon != 0.0) {
+      return ' 0{lat.toStringAsFixed(5)},${lon.toStringAsFixed(5)}';
+    }
     return '';
   }
-
+  
   /// Smart location extraction using multiple heuristics
   String _extractLocationSmart(String title) {
     // Common running keywords to filter out

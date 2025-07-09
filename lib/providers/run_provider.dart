@@ -4,10 +4,13 @@ import '../models/activity.dart';
 import '../services/csv_service.dart';
 import '../services/storage_service.dart';
 import 'package:intl/intl.dart';
+import '../services/strava_service.dart';
 
 class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
   final StorageService _storageService = StorageService();
+  final StravaService _stravaService = StravaService();
+  StravaService get stravaService => _stravaService;
   List<Activity> _activities = [];
   static int runsGetterCallCount = 0;
 
@@ -77,14 +80,59 @@ class RunProvider extends ChangeNotifier {
     return r.isEmpty ? null : r.map((r) => r.date).reduce((a, b) => a.isBefore(b) ? a : b);
   }
 
-  Future<void> importCsv() async {
-    final newActivities = await _csvService.pickAndParseCsv();
-    print('importCsv: loaded [0m' + newActivities.length.toString() + ' activities');
-    if (newActivities.isNotEmpty) {
-      _activities = newActivities;
-      // Optionally, persist activities as JSON if you want full data persistence
-      notifyListeners();
+  /// Import activities from Strava API
+  Future<void> importFromStrava() async {
+    final stravaActivities = await _stravaService.fetchActivities();
+    // Debug: print all activity types found
+    final types = stravaActivities.map((a) => a['type']).toSet();
+    print('Strava activity types found: ' + types.join(', '));
+    // Only import activities of type 'Run' or 'Trail Run'
+    final filteredActivities = stravaActivities.where((a) {
+      final type = (a['type'] ?? '').toString().toLowerCase();
+      return type == 'run' || type == 'trailrun';
+    }).toList();
+    // Convert Strava activities to Activity and Run objects
+    _activities = filteredActivities.map((a) {
+      // Map Strava fields to Activity fields
+      // Convert distance from meters to kilometers
+      final distanceMeters = (a['distance'] ?? 0).toString();
+      final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
+      // Use start_date_local if available, otherwise fallback to start_date
+      final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
+      final fields = <String, String>{
+        'Activity Type': (a['type'] ?? '').toString(),
+        'Date': dateLocal,
+        'Distance': distanceKm,
+        'Title': (a['name'] ?? '').toString(),
+        'Start Latitude': (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? a['start_latlng'][0].toString() : '',
+        'Start Longitude': (a['start_latlng'] is List && a['start_latlng'].length > 1) ? a['start_latlng'][1].toString() : '',
+        'Strava ID': (a['id'] ?? '').toString(),
+      };
+      return Activity(fields);
+    }).toList();
+    await _storageService.saveActivities(_activities);
+    // Debug: print all runs for June 17, 2025
+    final runsOnJune17 = _activities.map((a) => Run.fromCsv(a.fields)).where((r) =>
+      r.date.year == 2025 && r.date.month == 6 && r.date.day == 17).toList();
+    print('Runs on 2025-06-17: count=${runsOnJune17.length}');
+    for (final r in runsOnJune17) {
+      print('  - ${r.date} | ${r.distanceKm} km | lat: ${r.lat}, lon: ${r.lon} | title: ${r.title}');
     }
+    // Print all run dates and distances for the last 30 days
+    final allRuns = _activities.map((a) => Run.fromCsv(a.fields)).toList();
+    allRuns.sort((a, b) => b.date.compareTo(a.date));
+    print('All runs in last 30 days:');
+    final cutoff = DateTime.now().subtract(Duration(days: 30));
+    for (final r in allRuns.where((r) => r.date.isAfter(cutoff))) {
+      print('  - ${r.date} | ${r.distanceKm} km');
+    }
+    // Print dates included in the current streak
+    final streakDates = currentStreakRuns.map((r) => r.date).toList();
+    print('Current streak dates:');
+    for (final d in streakDates) {
+      print('  - $d');
+    }
+    notifyListeners();
   }
 
   Future<void> loadRuns() async {
