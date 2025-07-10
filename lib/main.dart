@@ -84,9 +84,30 @@ class _MyAppState extends State<MyApp> {
             ),
           ),
         ),
-        home: _stravaConnected
-            ? const HomeScreen()
-            : StravaWebViewScreen(onImportComplete: _onStravaImportComplete),
+        home: Stack(
+          children: [
+            _stravaConnected
+                ? HomeScreen()
+                : StravaWebViewScreen(onImportComplete: _onStravaImportComplete),
+            Consumer<RunProvider>(
+              builder: (context, runProvider, child) {
+                if (!runProvider.isSyncingCloud) return SizedBox.shrink();
+                return Positioned(
+                  right: 24,
+                  bottom: 24,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(Icons.sync, color: Colors.orange, size: 32),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

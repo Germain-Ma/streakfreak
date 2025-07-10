@@ -25,6 +25,8 @@ class RunProvider extends ChangeNotifier {
   int _importTotal = 0;
   String _importStatus = '';
   String? _athleteId;
+  bool _isSyncingCloud = false;
+  bool get isSyncingCloud => _isSyncingCloud;
 
   bool get isImporting => _isImporting;
   int get importProgress => _importProgress;
@@ -124,7 +126,7 @@ class RunProvider extends ChangeNotifier {
     _isImporting = true;
     _importProgress = 0;
     _importTotal = 0;
-    _importStatus = 'Fetching activities from Strava...';
+    _importStatus = 'Calculating estimated time...';
     notifyListeners();
 
     await ensureAthleteId();
@@ -141,47 +143,67 @@ class RunProvider extends ChangeNotifier {
     }).toList();
 
     _importTotal = filteredActivities.length;
-    _importStatus = 'Processing ${_importTotal} activities...';
+    _importStatus = 'Syncing activities from Strava... (${_importProgress}/${_importTotal})';
     notifyListeners();
 
-    List<Activity> newActivities = [];
-    List<Future<void>> countryFutures = [];
-    List<String?> countryResults = List.filled(filteredActivities.length, null);
-    int gpsDebugCount = 0;
+    // Bundle activities with very close GPS coordinates
+    const double epsilon = 0.01; // ~1km, adjust as needed
+    Map<String, List<int>> coordBundles = {};
+    List<Map<String, dynamic>> coords = [];
+    for (int i = 0; i < filteredActivities.length; i++) {
+      final a = filteredActivities[i];
+      final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
+      final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
+      bool bundled = false;
+      for (final entry in coordBundles.entries) {
+        final idx = entry.value.first;
+        final c = coords[idx];
+        if ((startLat - c['lat']).abs() < epsilon && (startLon - c['lon']).abs() < epsilon) {
+          entry.value.add(i);
+          bundled = true;
+          break;
+        }
+      }
+      if (!bundled) {
+        final key = '$startLat,$startLon';
+        coordBundles[key] = [i];
+        coords.add({'lat': startLat, 'lon': startLon});
+      }
+    }
 
-    // Cache for geocoding results
-    final Map<String, String?> geoCache = {};
-    final List<String> geoFailures = [];
-    // Process activities one by one for smooth progress
+    // Now process each bundle for country lookup
+    Map<String, String?> bundleCountries = {};
+    int bundleIdx = 0;
+    for (final entry in coordBundles.entries) {
+      final key = entry.key;
+      final idx = entry.value.first;
+      final lat = coords[idx]['lat'];
+      final lon = coords[idx]['lon'];
+      String? country;
+      try {
+        country = await (kIsWeb
+          ? _webGeocodingService.countryFromLatLon(lat, lon)
+          : _geocodingService.countryFromLatLon(lat, lon));
+      } catch (e) {
+        country = null;
+      }
+      bundleCountries[key] = country;
+      bundleIdx++;
+    }
+
+    // Now assign country to each activity
+    List<Activity> newActivities = [];
     for (int i = 0; i < filteredActivities.length; i++) {
       final a = filteredActivities[i];
       final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
       final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
       String? country;
-      String coordKey = '$startLat,$startLon';
-      if (startLat != 0.0 || startLon != 0.0) {
-        if (geoCache.containsKey(coordKey)) {
-          country = geoCache[coordKey];
-        } else {
-          int attempts = 0;
-          while (attempts < 3) {
-            try {
-              country = await (kIsWeb
-                ? _webGeocodingService.countryFromLatLon(startLat, startLon)
-                : _geocodingService.countryFromLatLon(startLat, startLon));
-              geoCache[coordKey] = country;
-              if (country != null) break;
-            } catch (e) {
-              attempts++;
-              if (attempts >= 3) {
-                geoFailures.add(coordKey);
-                geoCache[coordKey] = null;
-                print('[WARN] Geocoding failed for ($startLat, $startLon) after 3 attempts: $e');
-              } else {
-                await Future.delayed(const Duration(seconds: 1));
-              }
-            }
-          }
+      for (final entry in coordBundles.entries) {
+        final idx = entry.value.first;
+        final c = coords[idx];
+        if ((startLat - c['lat']).abs() < epsilon && (startLon - c['lon']).abs() < epsilon) {
+          country = bundleCountries[entry.key];
+          break;
         }
       }
       final distanceMeters = (a['distance'] ?? 0).toString();
@@ -209,20 +231,22 @@ class RunProvider extends ChangeNotifier {
       };
       newActivities.add(Activity(fields));
       _importProgress = i + 1;
-      _importStatus = 'Processing activities... (${_importProgress}/${_importTotal})';
+      _importStatus = 'Syncing activities from Strava... (${_importProgress}/${_importTotal})';
       notifyListeners();
     }
-    if (geoFailures.isNotEmpty) {
-      print('[Geocoding failures]: ${geoFailures.length} coordinates could not be resolved.');
-    }
 
-    _importStatus = 'Saving activities...';
+    _importStatus = 'Uploading to cloud...';
     notifyListeners();
-
-    _activities = newActivities;
-    await _storageService.saveActivities(_athleteId!, _activities);
-    // Upload to Supabase (one by one)
-    await _supabaseService.uploadActivities(_athleteId!, _activities, uploadIndividually: true);
+    _isSyncingCloud = true;
+    try {
+      _activities = newActivities;
+      await _storageService.saveActivities(_athleteId!, _activities);
+      // Upload all activities to Supabase in a single batch (background)
+      await _supabaseService.uploadActivities(_athleteId!, _activities);
+    } finally {
+      _isSyncingCloud = false;
+      notifyListeners();
+    }
 
     _importStatus = 'Finalizing...';
     notifyListeners();
@@ -258,12 +282,18 @@ class RunProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    // Fetch from Supabase
-    final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
-    // Optionally merge with local
-    _activities = cloudActivities;
-    await _storageService.saveActivities(_athleteId!, _activities);
+    _isSyncingCloud = true;
     notifyListeners();
+    try {
+      // Fetch from Supabase
+      final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
+      // Optionally merge with local
+      _activities = cloudActivities;
+      await _storageService.saveActivities(_athleteId!, _activities);
+    } finally {
+      _isSyncingCloud = false;
+      notifyListeners();
+    }
   }
 
   Future<void> clearRuns() async {
