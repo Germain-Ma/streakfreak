@@ -25,8 +25,10 @@ class WebGeocodingService {
   }
 
   Future<String?> countryFromLatLon(double lat, double lon) async {
+    // Use LocationIQ for web geocoding
+    final apiKey = 'pk.52d4e1ed1762aa7d94d7ecfb690595d2';
     final url = Uri.parse(
-      'https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lon&format=json&zoom=3&addressdetails=1'
+      'https://us1.locationiq.com/v1/reverse?key=$apiKey&lat=$lat&lon=$lon&format=json'
     );
     final response = await http.get(url, headers: {
       'User-Agent': 'streakfreak-app/1.0 (your@email.com)'

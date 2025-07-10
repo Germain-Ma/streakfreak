@@ -158,21 +158,35 @@ class RunProvider extends ChangeNotifier {
         final a = filteredActivities[i];
         final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
         final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
+        Future<void> countryFuture;
         if ((startLat != 0.0 || startLon != 0.0) && gpsDebugCount < 5) {
-          countryFutures.add((kIsWeb
+          countryFuture = ((kIsWeb
               ? _webGeocodingService.countryFromLatLon(startLat, startLon)
-              : _geocodingService.countryFromLatLon(startLat, startLon)).then((country) {
-            print('[DEBUG] GPS: ($startLat, $startLon) -> Country: $country');
-            countryResults[i] = country;
-          }));
+              : _geocodingService.countryFromLatLon(startLat, startLon))
+            .then((country) {
+              print('[DEBUG] GPS: ( 24startLat,  24startLon) -> Country:  24country');
+              countryResults[i] = country;
+            })
+            .catchError((e) {
+              print('[WARN] Geocoding failed for ( 24startLat,  24startLon):  24e');
+              countryResults[i] = null;
+            }));
           gpsDebugCount++;
         } else if (startLat != 0.0 || startLon != 0.0) {
-          countryFutures.add((kIsWeb
+          countryFuture = ((kIsWeb
               ? _webGeocodingService.countryFromLatLon(startLat, startLon)
-              : _geocodingService.countryFromLatLon(startLat, startLon)).then((country) {
-            countryResults[i] = country;
-          }));
+              : _geocodingService.countryFromLatLon(startLat, startLon))
+            .then((country) {
+              countryResults[i] = country;
+            })
+            .catchError((e) {
+              print('[WARN] Geocoding failed for ( 24startLat,  24startLon):  24e');
+              countryResults[i] = null;
+            }));
+        } else {
+          countryFuture = Future.value();
         }
+        countryFutures.add(countryFuture);
       }
 
       // Wait for current batch to complete
