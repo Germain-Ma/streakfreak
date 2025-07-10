@@ -8,6 +8,7 @@ import '../services/strava_service.dart';
 import '../services/geocoding_service.dart';
 import '../services/web_geocoding_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
@@ -22,6 +23,13 @@ class RunProvider extends ChangeNotifier {
   int _importProgress = 0;
   int _importTotal = 0;
   String _importStatus = '';
+  // Supabase sync state
+  bool _isSyncing = false;
+  String _syncStatus = '';
+  DateTime? _lastSyncTime;
+  bool get isSyncing => _isSyncing;
+  String get syncStatus => _syncStatus;
+  DateTime? get lastSyncTime => _lastSyncTime;
 
   bool get isImporting => _isImporting;
   int get importProgress => _importProgress;
@@ -217,6 +225,7 @@ class RunProvider extends ChangeNotifier {
 
     _activities = newActivities;
     await _storageService.saveActivities(_activities);
+    await _saveRunsToSupabase(_activities);
 
     _importStatus = 'Finalizing...';
     notifyListeners();
@@ -245,15 +254,254 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadRuns() async {
-    _activities = await _storageService.loadActivities();
+  // Load runs: local -> Supabase -> Strava
+  Future<void> loadRunsSmart() async {
+    // 1. Try local
+    final local = await _storageService.loadActivities();
+    if (local.isNotEmpty) {
+      _activities = local;
+      notifyListeners();
+      return;
+    }
+    // 2. Try Supabase
+    final supabaseRuns = await _loadRunsFromSupabase();
+    if (supabaseRuns.isNotEmpty) {
+      _activities = supabaseRuns;
+      await _storageService.saveActivities(_activities);
+      notifyListeners();
+      return;
+    }
+    // 3. Prompt Strava import (UI should handle this)
+    _activities = [];
     notifyListeners();
+  }
+
+  // Load from Supabase
+  Future<List<Activity>> _loadRunsFromSupabase() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return [];
+    final response = await Supabase.instance.client
+        .from('runs')
+        .select()
+        .eq('user_id', user.id)
+        .order('date', ascending: false);
+    if (response is List) {
+      return response.map((row) => Activity(_supabaseRowToFields(row))).toList();
+    }
+    return [];
+  }
+
+  // Save to Supabase
+  Future<void> _saveRunsToSupabase(List<Activity> activities) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    // Remove all user's runs first (for full sync)
+    await Supabase.instance.client.from('runs').delete().eq('user_id', user.id);
+    // Insert all
+    for (final a in activities) {
+      final fields = a.fields;
+      await Supabase.instance.client.from('runs').insert({
+        'user_id': user.id,
+        'date': fields['Date'],
+        'distance': double.tryParse(fields['Distance'] ?? '') ?? 0.0,
+        'title': fields['Title'],
+        'lat': double.tryParse(fields['Start Latitude'] ?? '') ?? 0.0,
+        'lon': double.tryParse(fields['Start Longitude'] ?? '') ?? 0.0,
+        'elevation_gain': double.tryParse(fields['Elevation Gain'] ?? '') ?? 0.0,
+        'moving_time': int.tryParse(fields['Moving Time'] ?? '') ?? 0,
+        'elapsed_time': int.tryParse(fields['Elapsed Time'] ?? '') ?? 0,
+        'avg_speed': double.tryParse(fields['Average Speed'] ?? '') ?? 0.0,
+        'max_speed': double.tryParse(fields['Max Speed'] ?? '') ?? 0.0,
+        'calories': int.tryParse(fields['Calories'] ?? '') ?? 0,
+        'strava_id': fields['Strava ID'],
+        'country': fields['Country'],
+        'avg_heart_rate': double.tryParse(fields['Avg Heart Rate'] ?? ''),
+        'max_heart_rate': double.tryParse(fields['Max Heart Rate'] ?? ''),
+      });
+    }
+  }
+
+  // Helper: convert Supabase row to Activity fields
+  Map<String, String> _supabaseRowToFields(Map row) {
+    return {
+      'Activity Type': 'run',
+      'Date': row['date'] ?? '',
+      'Distance': (row['distance'] ?? '').toString(),
+      'Title': row['title'] ?? '',
+      'Start Latitude': (row['lat'] ?? '').toString(),
+      'Start Longitude': (row['lon'] ?? '').toString(),
+      'Strava ID': row['strava_id'] ?? '',
+      'Elevation Gain': (row['elevation_gain'] ?? '').toString(),
+      'Moving Time': (row['moving_time'] ?? '').toString(),
+      'Elapsed Time': (row['elapsed_time'] ?? '').toString(),
+      'Average Speed': (row['avg_speed'] ?? '').toString(),
+      'Max Speed': (row['max_speed'] ?? '').toString(),
+      'Calories': (row['calories'] ?? '').toString(),
+      'Country': row['country'] ?? '',
+      'Avg Heart Rate': (row['avg_heart_rate'] ?? '').toString(),
+      'Max Heart Rate': (row['max_heart_rate'] ?? '').toString(),
+    };
+  }
+
+  // Sync local and Supabase (prefer most recent, or merge)
+  Future<void> syncWithSupabase() async {
+    _isSyncing = true;
+    _syncStatus = 'Syncing with cloud...';
+    notifyListeners();
+    final local = await _storageService.loadActivities();
+    final cloud = await _loadRunsFromSupabase();
+    // Simple strategy: if local is newer or same, upload; if cloud is newer, download
+    if (local.length >= cloud.length) {
+      await _saveRunsToSupabase(local);
+      _activities = local;
+      _syncStatus = 'Uploaded local data to cloud.';
+    } else {
+      _activities = cloud;
+      await _storageService.saveActivities(cloud);
+      _syncStatus = 'Downloaded cloud data to local.';
+    }
+    _lastSyncTime = DateTime.now();
+    _isSyncing = false;
+    notifyListeners();
+  }
+
+  // Sync with Strava (if cloud/local are empty or outdated)
+  Future<void> syncWithStravaIfNeeded() async {
+    final local = await _storageService.loadActivities();
+    final cloud = await _loadRunsFromSupabase();
+    if (local.isEmpty && cloud.isEmpty) {
+      await importFromStrava();
+      await _saveRunsToSupabase(_activities);
+    }
   }
 
   Future<void> clearRuns() async {
     _activities = [];
     await _storageService.clearActivities();
     notifyListeners();
+  }
+
+  // Efficient smart sync: local <-> Supabase <-> Strava
+  Future<void> smartSync() async {
+    _isSyncing = true;
+    _syncStatus = 'Checking sync status...';
+    notifyListeners();
+    // 1. Load local and Supabase
+    final local = await _storageService.loadActivities();
+    final cloud = await _loadRunsFromSupabase();
+    // 2. Compare by latest run date/ID
+    DateTime? localLatest = _getLatestRunDate(local);
+    DateTime? cloudLatest = _getLatestRunDate(cloud);
+    // 3. Sync local <-> Supabase
+    if (localLatest != null && (cloudLatest == null || localLatest.isAfter(cloudLatest))) {
+      await _saveRunsToSupabase(local);
+      _activities = local;
+      _syncStatus = 'Uploaded local data to cloud.';
+    } else if (cloudLatest != null && (localLatest == null || cloudLatest.isAfter(localLatest))) {
+      _activities = cloud;
+      await _storageService.saveActivities(cloud);
+      _syncStatus = 'Downloaded cloud data to local.';
+    } else {
+      _activities = local;
+      _syncStatus = 'Local and cloud are in sync.';
+    }
+    notifyListeners();
+    // 4. Check Strava for new runs
+    final stravaActivities = await _stravaService.fetchActivities();
+    final stravaRuns = stravaActivities.where((a) {
+      final type = (a['type'] ?? '').toString().toLowerCase();
+      return type == 'run' || type == 'trailrun';
+    }).toList();
+    DateTime? stravaLatest = _getLatestStravaRunDate(stravaRuns);
+    if (stravaLatest != null && (cloudLatest == null || stravaLatest.isAfter(cloudLatest))) {
+      // Only import new runs from Strava
+      final existingIds = cloud.map((a) => a.fields['Strava ID']).toSet();
+      final newStravaRuns = stravaRuns.where((a) => !existingIds.contains((a['id'] ?? '').toString())).toList();
+      if (newStravaRuns.isNotEmpty) {
+        _syncStatus = 'Importing new runs from Strava...';
+        notifyListeners();
+        // Use existing import logic, but only for new runs
+        List<Activity> newActivities = [];
+        List<Future<void>> countryFutures = [];
+        List<String?> countryResults = List.filled(newStravaRuns.length, null);
+        int gpsDebugCount = 0;
+        for (int i = 0; i < newStravaRuns.length; i++) {
+          final a = newStravaRuns[i];
+          final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
+          final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
+          if ((startLat != 0.0 || startLon != 0.0) && gpsDebugCount < 5) {
+            countryFutures.add((kIsWeb
+                ? _webGeocodingService.countryFromLatLon(startLat, startLon)
+                : _geocodingService.countryFromLatLon(startLat, startLon)).then((country) {
+              countryResults[i] = country;
+            }));
+            gpsDebugCount++;
+          } else if (startLat != 0.0 || startLon != 0.0) {
+            countryFutures.add((kIsWeb
+                ? _webGeocodingService.countryFromLatLon(startLat, startLon)
+                : _geocodingService.countryFromLatLon(startLat, startLon)).then((country) {
+              countryResults[i] = country;
+            }));
+          }
+        }
+        await Future.wait(countryFutures);
+        for (int i = 0; i < newStravaRuns.length; i++) {
+          final a = newStravaRuns[i];
+          final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
+          final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
+          final country = countryResults[i];
+          final distanceMeters = (a['distance'] ?? 0).toString();
+          final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
+          final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
+          final avgHeartRate = a['average_heartrate']?.toString();
+          final maxHeartRate = a['max_heartrate']?.toString();
+          final fields = <String, String>{
+            'Activity Type': (a['type'] ?? '').toString(),
+            'Date': dateLocal,
+            'Distance': distanceKm,
+            'Title': (a['name'] ?? '').toString(),
+            'Start Latitude': startLat.toString(),
+            'Start Longitude': startLon.toString(),
+            'Strava ID': (a['id'] ?? '').toString(),
+            'Elevation Gain': (a['total_elevation_gain'] ?? '').toString(),
+            'Moving Time': (a['moving_time'] ?? '').toString(),
+            'Elapsed Time': (a['elapsed_time'] ?? '').toString(),
+            'Average Speed': (a['average_speed'] ?? '').toString(),
+            'Max Speed': (a['max_speed'] ?? '').toString(),
+            'Calories': (a['calories'] ?? '').toString(),
+            'Country': country ?? '',
+            'Avg Heart Rate': avgHeartRate ?? '',
+            'Max Heart Rate': maxHeartRate ?? '',
+          };
+          newActivities.add(Activity(fields));
+        }
+        // Merge new activities with existing
+        final merged = List<Activity>.from(cloud)..addAll(newActivities);
+        _activities = merged;
+        await _storageService.saveActivities(merged);
+        await _saveRunsToSupabase(merged);
+        _syncStatus = 'Imported new runs from Strava.';
+      }
+    }
+    _lastSyncTime = DateTime.now();
+    _isSyncing = false;
+    notifyListeners();
+  }
+
+  DateTime? _getLatestRunDate(List<Activity> activities) {
+    if (activities.isEmpty) return null;
+    final dates = activities.map((a) => DateTime.tryParse(a.fields['Date'] ?? '')).whereType<DateTime>().toList();
+    if (dates.isEmpty) return null;
+    dates.sort((a, b) => b.compareTo(a));
+    return dates.first;
+  }
+
+  DateTime? _getLatestStravaRunDate(List<Map<String, dynamic>> stravaRuns) {
+    if (stravaRuns.isEmpty) return null;
+    final dates = stravaRuns.map((a) => DateTime.tryParse((a['start_date_local'] ?? a['start_date'] ?? '').toString())).whereType<DateTime>().toList();
+    if (dates.isEmpty) return null;
+    dates.sort((a, b) => b.compareTo(a));
+    return dates.first;
   }
 
   // Helper: Get runs with at least 1.61 km per day (for streak logic)

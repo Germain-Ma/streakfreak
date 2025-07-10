@@ -57,68 +57,92 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 );
               } else {
-                return IconButton(
-                  icon: const Icon(Icons.sync, color: Color(0xFFFF512F)),
-                  tooltip: 'Sync with Strava',
-                  onPressed: () async {
-                    // Show progress dialog for long imports
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (BuildContext context) {
-                        return Consumer<RunProvider>(
-                          builder: (context, runProvider, child) {
-                            return AlertDialog(
-                              backgroundColor: const Color(0xFF23243B),
-                              title: const Text('Syncing with Strava', style: TextStyle(color: Colors.white)),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (runProvider.importTotal > 0) ...[
-                                    LinearProgressIndicator(
-                                      value: runProvider.importProgress / runProvider.importTotal,
-                                      backgroundColor: Colors.grey[800],
-                                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF512F)),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      '${runProvider.importProgress}/${runProvider.importTotal} activities processed',
-                                      style: const TextStyle(color: Colors.white70),
-                                    ),
-                                  ] else ...[
-                                    const CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF512F)),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    runProvider.importStatus,
-                                    style: const TextStyle(color: Colors.white70),
-                                    textAlign: TextAlign.center,
+                return Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.cloud_sync, color: Color(0xFF1A2980)),
+                      tooltip: 'Sync with Cloud',
+                      onPressed: () async {
+                        await runProvider.syncWithSupabase();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(runProvider.syncStatus)),
+                          );
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.sync, color: Color(0xFFFF512F)),
+                      tooltip: 'Sync with Strava',
+                      onPressed: () async {
+                        // Show progress dialog for long imports
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (BuildContext context) {
+                            return Consumer<RunProvider>(
+                              builder: (context, runProvider, child) {
+                                return AlertDialog(
+                                  backgroundColor: const Color(0xFF23243B),
+                                  title: const Text('Syncing with Strava', style: TextStyle(color: Colors.white)),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (runProvider.importTotal > 0) ...[
+                                        LinearProgressIndicator(
+                                          value: runProvider.importProgress / runProvider.importTotal,
+                                          backgroundColor: Colors.grey[800],
+                                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF512F)),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          '${runProvider.importProgress}/${runProvider.importTotal} activities processed',
+                                          style: const TextStyle(color: Colors.white70),
+                                        ),
+                                      ] else ...[
+                                        const CircularProgressIndicator(
+                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF512F)),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        runProvider.importStatus,
+                                        style: const TextStyle(color: Colors.white70),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                );
+                              },
                             );
                           },
                         );
+
+                        await runProvider.importFromStrava();
+
+                        // Close the progress dialog
+                        if (mounted) {
+                          Navigator.of(context).pop();
+                        }
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Synced with Strava! Imported ${runProvider.activities.length} activities.'),
+                            ),
+                          );
+                        }
                       },
-                    );
-
-                    await runProvider.importFromStrava();
-
-                    // Close the progress dialog
-                    if (mounted) {
-                      Navigator.of(context).pop();
-                    }
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Synced with Strava! Imported ${runProvider.activities.length} activities.'),
+                    ),
+                    if (runProvider.lastSyncTime != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: Text(
+                          'Last sync: ${runProvider.lastSyncTime!.toLocal().toString().substring(0, 16)}',
+                          style: const TextStyle(fontSize: 12, color: Colors.white70),
                         ),
-                      );
-                    }
-                  },
+                      ),
+                  ],
                 );
               }
             },

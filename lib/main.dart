@@ -18,7 +18,7 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _stravaConnected = false;
   int _importedTotal = 0;
   int _importedGps = 0;
@@ -27,6 +27,16 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _stravaConnected = false;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // On resume, trigger smart sync
+      final runProvider = Provider.of<RunProvider>(context, listen: false);
+      runProvider.smartSync();
+    }
   }
 
   void _onStravaImportComplete(int total, int gps) {
@@ -34,6 +44,9 @@ class _MyAppState extends State<MyApp> {
       _stravaConnected = true;
       _importedTotal = total;
       _importedGps = gps;
+      // After first import, trigger smart sync
+      final runProvider = Provider.of<RunProvider>(context, listen: false);
+      runProvider.smartSync();
     });
   }
 
@@ -41,7 +54,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => RunProvider()..loadRuns()),
+        ChangeNotifierProvider(create: (_) => RunProvider()..smartSync()),
         ChangeNotifierProxyProvider<RunProvider, LocationProvider>(
           create: (_) => LocationProvider(null),
           update: (_, runProv, prev) {
