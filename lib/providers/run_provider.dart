@@ -211,10 +211,6 @@ class RunProvider extends ChangeNotifier {
       _importProgress = i + 1;
       _importStatus = 'Processing activities... (${_importProgress}/${_importTotal})';
       notifyListeners();
-      // Throttle for LocationIQ (2/sec)
-      if (kIsWeb && (startLat != 0.0 || startLon != 0.0)) {
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
     }
     if (geoFailures.isNotEmpty) {
       print('[Geocoding failures]: ${geoFailures.length} coordinates could not be resolved.');
