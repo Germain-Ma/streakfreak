@@ -8,6 +8,7 @@ import '../services/strava_service.dart';
 import '../services/geocoding_service.dart';
 import '../services/web_geocoding_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../services/supabase_service.dart';
 
 class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
@@ -15,6 +16,7 @@ class RunProvider extends ChangeNotifier {
   final StravaService _stravaService = StravaService();
   final GeocodingService _geocodingService = GeocodingService();
   final WebGeocodingService _webGeocodingService = WebGeocodingService();
+  final SupabaseService _supabaseService = SupabaseService();
   StravaService get stravaService => _stravaService;
   List<Activity> _activities = [];
   // Progress tracking
@@ -261,6 +263,8 @@ class RunProvider extends ChangeNotifier {
 
     _activities = newActivities;
     await _storageService.saveActivities(_athleteId!, _activities);
+    // Upload to Supabase
+    await _supabaseService.uploadActivities(_athleteId!, _activities);
 
     _importStatus = 'Finalizing...';
     notifyListeners();
@@ -296,7 +300,11 @@ class RunProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    _activities = await _storageService.loadActivities(_athleteId!);
+    // Fetch from Supabase
+    final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
+    // Optionally merge with local
+    _activities = cloudActivities;
+    await _storageService.saveActivities(_athleteId!, _activities);
     notifyListeners();
   }
 
