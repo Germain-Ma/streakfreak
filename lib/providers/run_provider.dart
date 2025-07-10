@@ -149,6 +149,8 @@ class RunProvider extends ChangeNotifier {
 
     // Process activities in batches for better progress tracking
     const int batchSize = 50;
+    int webGeoRequests = 0;
+    DateTime lastWebGeoRequest = DateTime.now().subtract(const Duration(seconds: 1));
     for (int batchStart = 0; batchStart < filteredActivities.length; batchStart += batchSize) {
       final batchEnd = (batchStart + batchSize < filteredActivities.length)
           ? batchStart + batchSize
@@ -160,19 +162,39 @@ class RunProvider extends ChangeNotifier {
         final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
         Future<void> countryFuture;
         if ((startLat != 0.0 || startLon != 0.0) && gpsDebugCount < 5) {
+          if (kIsWeb) {
+            // Throttle to 2 requests/sec for LocationIQ free tier
+            final now = DateTime.now();
+            final msSinceLast = now.difference(lastWebGeoRequest).inMilliseconds;
+            if (msSinceLast < 500) {
+              await Future.delayed(Duration(milliseconds: 500 - msSinceLast));
+            }
+            lastWebGeoRequest = DateTime.now();
+            webGeoRequests++;
+          }
           countryFuture = ((kIsWeb
               ? _webGeocodingService.countryFromLatLon(startLat, startLon)
               : _geocodingService.countryFromLatLon(startLat, startLon))
             .then((country) {
-              print('[DEBUG] GPS: ( 24startLat,  24startLon) -> Country:  24country');
+              print('[DEBUG] GPS: ($startLat, $startLon) -> Country: $country');
               countryResults[i] = country;
             })
             .catchError((e) {
-              print('[WARN] Geocoding failed for ( 24startLat,  24startLon):  24e');
+              print('[WARN] Geocoding failed for ($startLat, $startLon): $e');
               countryResults[i] = null;
             }));
           gpsDebugCount++;
         } else if (startLat != 0.0 || startLon != 0.0) {
+          if (kIsWeb) {
+            // Throttle to 2 requests/sec for LocationIQ free tier
+            final now = DateTime.now();
+            final msSinceLast = now.difference(lastWebGeoRequest).inMilliseconds;
+            if (msSinceLast < 500) {
+              await Future.delayed(Duration(milliseconds: 500 - msSinceLast));
+            }
+            lastWebGeoRequest = DateTime.now();
+            webGeoRequests++;
+          }
           countryFuture = ((kIsWeb
               ? _webGeocodingService.countryFromLatLon(startLat, startLon)
               : _geocodingService.countryFromLatLon(startLat, startLon))
@@ -180,7 +202,7 @@ class RunProvider extends ChangeNotifier {
               countryResults[i] = country;
             })
             .catchError((e) {
-              print('[WARN] Geocoding failed for ( 24startLat,  24startLon):  24e');
+              print('[WARN] Geocoding failed for ($startLat, $startLon): $e');
               countryResults[i] = null;
             }));
         } else {

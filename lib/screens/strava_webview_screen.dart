@@ -25,6 +25,32 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
   int _gps = 0;
   bool _oauthStarted = false;
   final StravaService _stravaService = StravaService();
+  int _importProgress = 0;
+  int _importTotal = 0;
+  Duration _estimatedRemaining = Duration.zero;
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer(int total, int progress) {
+    _timer?.cancel();
+    setState(() {
+      _importTotal = total;
+      _importProgress = progress;
+      _estimatedRemaining = Duration(seconds: ((total - progress) / 2).ceil());
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() {
+        if (_estimatedRemaining.inSeconds > 0) {
+          _estimatedRemaining -= const Duration(seconds: 1);
+        }
+      });
+    });
+  }
 
   @override
   void initState() {
@@ -154,6 +180,32 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
                 if (_isLoading)
                   Consumer<RunProvider>(
                     builder: (context, runProvider, child) {
+                      // Start timer if not already started
+                      if (_timer == null && runProvider.importTotal > 0) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _startTimer(runProvider.importTotal, runProvider.importProgress);
+                        });
+                      }
+                      // Update timer progress
+                      if (_importProgress != runProvider.importProgress) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          setState(() {
+                            _importProgress = runProvider.importProgress;
+                            _estimatedRemaining = Duration(seconds: ((_importTotal - _importProgress) / 2).ceil());
+                          });
+                        });
+                      }
+                      String formatDuration(Duration d) {
+                        String twoDigits(int n) => n.toString().padLeft(2, '0');
+                        final h = d.inHours;
+                        final m = d.inMinutes % 60;
+                        final s = d.inSeconds % 60;
+                        if (h > 0) {
+                          return '${twoDigits(h)}:${twoDigits(m)}:${twoDigits(s)}';
+                        } else {
+                          return '${twoDigits(m)}:${twoDigits(s)}';
+                        }
+                      }
                       return Column(
                         children: [
                           const SizedBox(height: 24),
@@ -165,6 +217,14 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
                               : 'Syncing activities from Strava...',
                             style: const TextStyle(color: Colors.white),
                           ),
+                          if (_estimatedRemaining.inSeconds > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                'Estimated time remaining: ${formatDuration(_estimatedRemaining)}',
+                                style: const TextStyle(color: Colors.white70, fontSize: 16),
+                              ),
+                            ),
                         ],
                       );
                     },
