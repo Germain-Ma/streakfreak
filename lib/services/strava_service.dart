@@ -10,6 +10,7 @@ class StravaService {
   static const String authUrl = 'https://www.strava.com/oauth/authorize';
   static const String tokenUrl = 'https://www.strava.com/oauth/token';
   static const String activitiesUrl = 'https://www.strava.com/api/v3/athlete/activities';
+  static const String athleteUrl = 'https://www.strava.com/api/v3/athlete';
 
   Future<void> authenticate() async {
     final url = Uri.parse('$authUrl?client_id=$clientId&response_type=code&redirect_uri=$redirectUri&approval_prompt=auto&scope=activity:read_all');
@@ -36,6 +37,8 @@ class StravaService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('strava_access_token', data['access_token']);
       await prefs.setString('strava_refresh_token', data['refresh_token']);
+      // Fetch and store athlete ID after successful token exchange
+      await fetchAndStoreAthleteId();
       return data['access_token'];
     } else {
       print('Strava token exchange failed: ${response.statusCode}');
@@ -80,5 +83,29 @@ class StravaService {
       }
     }
     return allActivities;
+  }
+
+  Future<String?> fetchAndStoreAthleteId() async {
+    final accessToken = await getAccessToken();
+    if (accessToken == null) return null;
+    final response = await http.get(
+      Uri.parse(athleteUrl),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final athleteId = data['id']?.toString();
+      if (athleteId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('strava_athlete_id', athleteId);
+        return athleteId;
+      }
+    }
+    return null;
+  }
+
+  Future<String?> getAthleteId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('strava_athlete_id');
   }
 } 

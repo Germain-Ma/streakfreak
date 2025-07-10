@@ -22,6 +22,7 @@ class RunProvider extends ChangeNotifier {
   int _importProgress = 0;
   int _importTotal = 0;
   String _importStatus = '';
+  String? _athleteId;
 
   bool get isImporting => _isImporting;
   int get importProgress => _importProgress;
@@ -124,6 +125,13 @@ class RunProvider extends ChangeNotifier {
     _importStatus = 'Fetching activities from Strava...';
     notifyListeners();
 
+    await ensureAthleteId();
+    if (_athleteId == null) {
+      _importStatus = 'Could not determine Strava athlete ID.';
+      notifyListeners();
+      return;
+    }
+
     final stravaActivities = await _stravaService.fetchActivities();
     final filteredActivities = stravaActivities.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
@@ -216,7 +224,7 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
 
     _activities = newActivities;
-    await _storageService.saveActivities(_activities);
+    await _storageService.saveActivities(_athleteId!, _activities);
 
     _importStatus = 'Finalizing...';
     notifyListeners();
@@ -246,13 +254,25 @@ class RunProvider extends ChangeNotifier {
   }
 
   Future<void> loadRuns() async {
-    _activities = await _storageService.loadActivities();
+    await ensureAthleteId();
+    if (_athleteId == null) {
+      _activities = [];
+      notifyListeners();
+      return;
+    }
+    _activities = await _storageService.loadActivities(_athleteId!);
     notifyListeners();
   }
 
   Future<void> clearRuns() async {
+    await ensureAthleteId();
+    if (_athleteId == null) {
+      _activities = [];
+      notifyListeners();
+      return;
+    }
     _activities = [];
-    await _storageService.clearActivities();
+    await _storageService.clearActivities(_athleteId!);
     notifyListeners();
   }
 
@@ -398,5 +418,9 @@ class RunProvider extends ChangeNotifier {
       maxEnd = runs.length - 1;
     }
     return runs[maxStart].date;
+  }
+
+  Future<void> ensureAthleteId() async {
+    _athleteId ??= await _stravaService.getAthleteId();
   }
 } 
