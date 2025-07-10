@@ -26,8 +26,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // TODO: Check persistent storage for Strava connection status
-    // For now, always show WebView until connected in this session
     _stravaConnected = false;
   }
 
@@ -56,7 +54,35 @@ class _MyAppState extends State<MyApp> {
       child: MaterialApp(
         title: 'StreakFreak',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          brightness: Brightness.dark,
+          fontFamily: 'Roboto',
+          scaffoldBackgroundColor: const Color(0xFF181A20),
+          colorScheme: ColorScheme.dark(
+            primary: const Color(0xFF1A2980),
+            secondary: const Color(0xFFFF512F),
+            background: const Color(0xFF181A20),
+            surface: const Color(0xFF23243B),
+          ),
+          cardColor: const Color(0xFF23243B),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF181A20),
+            elevation: 0,
+            titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          textTheme: const TextTheme(
+            headlineSmall: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+            titleMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white70),
+            bodyMedium: TextStyle(fontSize: 16, color: Colors.white70),
+            bodyLarge: TextStyle(fontSize: 18, color: Colors.white),
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF512F),
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontWeight: FontWeight.bold),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
         ),
         home: _stravaConnected
             ? const HomeScreen()

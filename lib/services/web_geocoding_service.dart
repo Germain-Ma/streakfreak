@@ -23,4 +23,20 @@ class WebGeocodingService {
     }
     return null;
   }
+
+  Future<String?> countryFromLatLon(double lat, double lon) async {
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lon&format=json&zoom=3&addressdetails=1'
+    );
+    final response = await http.get(url, headers: {
+      'User-Agent': 'streakfreak-app/1.0 (your@email.com)'
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data is Map && data['address'] != null && data['address']['country'] != null) {
+        return data['address']['country'] as String;
+      }
+    }
+    return null;
+  }
 } 

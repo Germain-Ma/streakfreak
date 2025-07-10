@@ -4,17 +4,68 @@ class Run {
   final double lat;
   final double lon;
   final String title;
-  const Run({required this.date, required this.distanceKm, required this.lat, required this.lon, required this.title});
+  final double elevationGain;
+  final int movingTime;
+  final int elapsedTime;
+  final double avgSpeed;
+  final double maxSpeed;
+  final int calories;
+  final String stravaId;
+  final String? country;
+  final double? avgHeartRate;
+  final double? maxHeartRate;
+  const Run({
+    required this.date,
+    required this.distanceKm,
+    required this.lat,
+    required this.lon,
+    required this.title,
+    required this.elevationGain,
+    required this.movingTime,
+    required this.elapsedTime,
+    required this.avgSpeed,
+    required this.maxSpeed,
+    required this.calories,
+    required this.stravaId,
+    this.country,
+    this.avgHeartRate,
+    this.maxHeartRate,
+  });
 
   factory Run.fromCsv(Map<String, String> row) {
     try {
-      // Parse ISO8601 date (Strava uses UTC, e.g. '2023-07-08T10:00:00Z')
-      final date = DateTime.parse(row['Date']!); // Always use UTC for streak logic
+      final date = DateTime.parse(row['Date']!);
       final distanceKm = double.tryParse(row['Distance'] ?? '') ?? 0.0;
       final title = row['Title'] ?? '';
       final lat = double.tryParse(row['Start Latitude'] ?? '') ?? 0.0;
       final lon = double.tryParse(row['Start Longitude'] ?? '') ?? 0.0;
-      return Run(date: date, distanceKm: distanceKm, lat: lat, lon: lon, title: title);
+      final elevationGain = double.tryParse(row['Elevation Gain'] ?? '') ?? 0.0;
+      final movingTime = int.tryParse(row['Moving Time'] ?? '') ?? 0;
+      final elapsedTime = int.tryParse(row['Elapsed Time'] ?? '') ?? 0;
+      final avgSpeed = double.tryParse(row['Average Speed'] ?? '') ?? 0.0;
+      final maxSpeed = double.tryParse(row['Max Speed'] ?? '') ?? 0.0;
+      final calories = int.tryParse(row['Calories'] ?? '') ?? 0;
+      final stravaId = row['Strava ID'] ?? '';
+      final country = row['Country'];
+      final avgHeartRate = double.tryParse(row['Avg Heart Rate'] ?? '');
+      final maxHeartRate = double.tryParse(row['Max Heart Rate'] ?? '');
+      return Run(
+        date: date,
+        distanceKm: distanceKm,
+        lat: lat,
+        lon: lon,
+        title: title,
+        elevationGain: elevationGain,
+        movingTime: movingTime,
+        elapsedTime: elapsedTime,
+        avgSpeed: avgSpeed,
+        maxSpeed: maxSpeed,
+        calories: calories,
+        stravaId: stravaId,
+        country: country,
+        avgHeartRate: avgHeartRate,
+        maxHeartRate: maxHeartRate,
+      );
     } catch (e) {
       print('Failed to parse Run from row: $row, error: $e');
       rethrow;
@@ -27,6 +78,16 @@ class Run {
         'la': lat,
         'lo': lon,
         't': title,
+        'e': elevationGain,
+        'mt': movingTime,
+        'et': elapsedTime,
+        'as': avgSpeed,
+        'ms': maxSpeed,
+        'c': calories,
+        'sid': stravaId,
+        'country': country,
+        'ahr': avgHeartRate,
+        'mhr': maxHeartRate,
       };
 
   factory Run.fromJson(Map<String, dynamic> j) => Run(
@@ -35,6 +96,16 @@ class Run {
         lat: (j['la'] as num).toDouble(),
         lon: (j['lo'] as num).toDouble(),
         title: j['t'] ?? '',
+        elevationGain: (j['e'] as num?)?.toDouble() ?? 0.0,
+        movingTime: (j['mt'] as num?)?.toInt() ?? 0,
+        elapsedTime: (j['et'] as num?)?.toInt() ?? 0,
+        avgSpeed: (j['as'] as num?)?.toDouble() ?? 0.0,
+        maxSpeed: (j['ms'] as num?)?.toDouble() ?? 0.0,
+        calories: (j['c'] as num?)?.toInt() ?? 0,
+        stravaId: j['sid'] ?? '',
+        country: j['country'],
+        avgHeartRate: (j['ahr'] as num?)?.toDouble(),
+        maxHeartRate: (j['mhr'] as num?)?.toDouble(),
       );
 
   /// Location is now based on GPS coordinates, not title

@@ -1,18 +1,32 @@
 import 'package:flutter/material.dart';
-
 import '../models/run.dart';
 import '../models/activity.dart';
 import '../services/csv_service.dart';
 import '../services/storage_service.dart';
 import 'package:intl/intl.dart';
 import '../services/strava_service.dart';
+import '../services/geocoding_service.dart';
+import '../services/web_geocoding_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
   final StorageService _storageService = StorageService();
   final StravaService _stravaService = StravaService();
+  final GeocodingService _geocodingService = GeocodingService();
+  final WebGeocodingService _webGeocodingService = WebGeocodingService();
   StravaService get stravaService => _stravaService;
   List<Activity> _activities = [];
+  // Progress tracking
+  bool _isImporting = false;
+  int _importProgress = 0;
+  int _importTotal = 0;
+  String _importStatus = '';
+
+  bool get isImporting => _isImporting;
+  int get importProgress => _importProgress;
+  int get importTotal => _importTotal;
+  String get importStatus => _importStatus;
   static int runsGetterCallCount = 0;
 
   List<Activity> get activities => _activities;
@@ -81,34 +95,153 @@ class RunProvider extends ChangeNotifier {
     return r.isEmpty ? null : r.map((r) => r.date).reduce((a, b) => a.isBefore(b) ? a : b);
   }
 
+  void debugPrintAllActivities() {
+    final allRuns = runs;
+    final withGps = allRuns.where((r) => r.lat != 0.0 || r.lon != 0.0).length;
+    final withoutGps = allRuns.length - withGps;
+    print('--- DEBUG: Activities Summary ---');
+    print('Total runs: ${allRuns.length}');
+    print('Runs with GPS: $withGps');
+    print('Runs without GPS: $withoutGps');
+    if (allRuns.isNotEmpty) {
+      print('First 2 runs:');
+      for (final run in allRuns.take(2)) {
+        print('  Date: ${run.date.toIso8601String()}, Distance: ${run.distanceKm}, Title: ${run.title}');
+      }
+      print('Last 2 runs:');
+      for (final run in allRuns.reversed.take(2)) {
+        print('  Date: ${run.date.toIso8601String()}, Distance: ${run.distanceKm}, Title: ${run.title}');
+      }
+    }
+    print('--- END DEBUG ---');
+  }
+
   /// Import activities from Strava API
   Future<void> importFromStrava() async {
+    _isImporting = true;
+    _importProgress = 0;
+    _importTotal = 0;
+    _importStatus = 'Fetching activities from Strava...';
+    notifyListeners();
+
     final stravaActivities = await _stravaService.fetchActivities();
-    // Only import activities of type 'Run' or 'Trail Run'
     final filteredActivities = stravaActivities.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
       return type == 'run' || type == 'trailrun';
     }).toList();
-    // Convert Strava activities to Activity and Run objects
-    _activities = filteredActivities.map((a) {
-      // Map Strava fields to Activity fields
-      // Convert distance from meters to kilometers
+
+    _importTotal = filteredActivities.length;
+    _importStatus = 'Processing ${_importTotal} activities...';
+    notifyListeners();
+
+    List<Activity> newActivities = [];
+    List<Future<void>> countryFutures = [];
+    List<String?> countryResults = List.filled(filteredActivities.length, null);
+    int gpsDebugCount = 0;
+
+    // Process activities in batches for better progress tracking
+    const int batchSize = 50;
+    for (int batchStart = 0; batchStart < filteredActivities.length; batchStart += batchSize) {
+      final batchEnd = (batchStart + batchSize < filteredActivities.length)
+          ? batchStart + batchSize
+          : filteredActivities.length;
+
+      for (int i = batchStart; i < batchEnd; i++) {
+        final a = filteredActivities[i];
+        final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
+        final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
+        if ((startLat != 0.0 || startLon != 0.0) && gpsDebugCount < 5) {
+          countryFutures.add((kIsWeb
+              ? _webGeocodingService.countryFromLatLon(startLat, startLon)
+              : _geocodingService.countryFromLatLon(startLat, startLon)).then((country) {
+            print('[DEBUG] GPS: ($startLat, $startLon) -> Country: $country');
+            countryResults[i] = country;
+          }));
+          gpsDebugCount++;
+        } else if (startLat != 0.0 || startLon != 0.0) {
+          countryFutures.add((kIsWeb
+              ? _webGeocodingService.countryFromLatLon(startLat, startLon)
+              : _geocodingService.countryFromLatLon(startLat, startLon)).then((country) {
+            countryResults[i] = country;
+          }));
+        }
+      }
+
+      // Wait for current batch to complete
+      await Future.wait(countryFutures);
+      countryFutures.clear();
+
+      // Update progress
+      _importProgress = batchEnd;
+      _importStatus = 'Processing activities... (${_importProgress}/${_importTotal})';
+      notifyListeners();
+    }
+
+    _importStatus = 'Creating activity records...';
+    notifyListeners();
+
+    // Create activity records
+    for (int i = 0; i < filteredActivities.length; i++) {
+      final a = filteredActivities[i];
+      final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
+      final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
+      final country = countryResults[i];
       final distanceMeters = (a['distance'] ?? 0).toString();
       final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
-      // Use start_date_local if available, otherwise fallback to start_date
       final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
+      final avgHeartRate = a['average_heartrate']?.toString();
+      final maxHeartRate = a['max_heartrate']?.toString();
       final fields = <String, String>{
         'Activity Type': (a['type'] ?? '').toString(),
         'Date': dateLocal,
         'Distance': distanceKm,
         'Title': (a['name'] ?? '').toString(),
-        'Start Latitude': (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? a['start_latlng'][0].toString() : '',
-        'Start Longitude': (a['start_latlng'] is List && a['start_latlng'].length > 1) ? a['start_latlng'][1].toString() : '',
+        'Start Latitude': startLat.toString(),
+        'Start Longitude': startLon.toString(),
         'Strava ID': (a['id'] ?? '').toString(),
+        'Elevation Gain': (a['total_elevation_gain'] ?? '').toString(),
+        'Moving Time': (a['moving_time'] ?? '').toString(),
+        'Elapsed Time': (a['elapsed_time'] ?? '').toString(),
+        'Average Speed': (a['average_speed'] ?? '').toString(),
+        'Max Speed': (a['max_speed'] ?? '').toString(),
+        'Calories': (a['calories'] ?? '').toString(),
+        'Country': country ?? '',
+        'Avg Heart Rate': avgHeartRate ?? '',
+        'Max Heart Rate': maxHeartRate ?? '',
       };
-      return Activity(fields);
-    }).toList();
+      newActivities.add(Activity(fields));
+    }
+
+    _importStatus = 'Saving activities...';
+    notifyListeners();
+
+    _activities = newActivities;
     await _storageService.saveActivities(_activities);
+
+    _importStatus = 'Finalizing...';
+    notifyListeners();
+
+    debugPrintAllActivities();
+    // Debug output for country statistics
+    final runsList = runs;
+    final countryStats = <String, int>{};
+    for (final run in runsList) {
+      final country = run.country ?? '';
+      if (country.trim().isEmpty) continue;
+      countryStats[country] = (countryStats[country] ?? 0) + 1;
+    }
+    final sortedCountries = countryStats.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    print('--- DEBUG: Country Statistics ---');
+    for (final entry in sortedCountries) {
+      print('${entry.key}: ${entry.value}');
+    }
+    print('--- END COUNTRY DEBUG ---');
+
+    _isImporting = false;
+    _importProgress = 0;
+    _importTotal = 0;
+    _importStatus = '';
     notifyListeners();
   }
 
@@ -125,15 +258,29 @@ class RunProvider extends ChangeNotifier {
 
   // Helper: Get runs with at least 1.61 km per day (for streak logic)
   List<Run> get _qualifiedRuns {
-    // Group by date, sum distances per day, and only include days with >= 1.61 km
+    // Group by local date (year, month, day) as in the activity's local time zone
     final byDate = <DateTime, double>{};
     for (final run in runs) {
-      final day = DateTime(run.date.year, run.date.month, run.date.day);
-      byDate[day] = (byDate[day] ?? 0) + run.distanceKm;
+      // Use the date as-is, assuming it is already in the activity's local time zone
+      final localDay = DateTime(run.date.year, run.date.month, run.date.day);
+      byDate[localDay] = (byDate[localDay] ?? 0) + run.distanceKm;
     }
     return byDate.entries
       .where((e) => e.value >= 1.61)
-      .map<Run>((e) => Run(date: e.key, distanceKm: e.value, lat: 0, lon: 0, title: ''))
+      .map<Run>((e) => Run(
+        date: e.key,
+        distanceKm: e.value,
+        lat: 0,
+        lon: 0,
+        title: '',
+        elevationGain: 0,
+        movingTime: 0,
+        elapsedTime: 0,
+        avgSpeed: 0,
+        maxSpeed: 0,
+        calories: 0,
+        stravaId: '',
+      ))
       .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
   }

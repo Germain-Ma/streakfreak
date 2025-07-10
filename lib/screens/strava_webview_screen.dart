@@ -152,13 +152,22 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
                       child: const Text('Connect to Strava', style: TextStyle(fontSize: 18)),
                     ),
                 if (_isLoading)
-                  Column(
-                    children: const [
-                      SizedBox(height: 24),
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('Syncing activities from Strava...', style: TextStyle(color: Colors.white)),
-                    ],
+                  Consumer<RunProvider>(
+                    builder: (context, runProvider, child) {
+                      return Column(
+                        children: [
+                          const SizedBox(height: 24),
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          Text(
+                            runProvider.isImporting && runProvider.importTotal > 0
+                              ? 'Syncing activities from Strava... (${runProvider.importProgress}/${runProvider.importTotal})'
+                              : 'Syncing activities from Strava...',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 if (_isSuccess)
                   Column(

@@ -30,4 +30,16 @@ class GeocodingService {
       return null; // silently ignore
     }
   }
+
+  Future<String?> countryFromLatLon(double lat, double lon) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(lat, lon);
+      if (placemarks.isNotEmpty) {
+        return placemarks.first.country;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }
