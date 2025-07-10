@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class StravaService {
   static const String clientId = '167512'; // Replace with your Strava Client ID
   static const String clientSecret = '6780c73a79c2380e2d3acb315a94c62ad6876cd3'; // Updated to your real Strava Client Secret
-  static const String redirectUri = 'http://localhost'; // Use your registered redirect URI
+  static const String redirectUri = 'https://germain-ma.github.io/streakfreak/'; // Use your registered redirect URI
   static const String authUrl = 'https://www.strava.com/oauth/authorize';
   static const String tokenUrl = 'https://www.strava.com/oauth/token';
   static const String activitiesUrl = 'https://www.strava.com/api/v3/athlete/activities';
