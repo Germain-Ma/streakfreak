@@ -76101,7 +76101,7 @@ case 1:return A.M(p.at(-1),r)}})
 return A.O($async$n2,r)},
 a5L(){if(this.x)return
 this.x=!0
-var s=window.open("https://www.strava.com/oauth/authorize?client_id=167512&response_type=code&redirect_uri=https://germain-ma.github.io/streakfreak/&approval_prompt=auto&scope=activity:read_all","_self")
+var s=window.open("https://www.strava.com/oauth/authorize?client_id=167512&response_type=code&redirect_uri=https://germain-ma.github.io/streakfreak&approval_prompt=auto&scope=activity:read_all","_self")
 A.aJB(s)},
 O(a){var s=this,r=null,q=t.p,p=A.b([B.LS,new A.qT(A.aHJ(r,r,new A.vt("assets/logo.png",r,r)),100,r,r),B.jo,A.c2("StreakFreak",A.iQ(r,r,B.j,r,r,r,r,r,r,r,r,32,r,r,B.ah,r,r,!0,r,r,r,r,r,A.b([new A.jB(B.cw,B.i,8)],t.kO),r,r),r),B.aV],q)
 if(!s.e&&!s.f)p.push(A.aux(B.QZ,s.ga5K(),A.auy(r,r,B.B7,r,r,r,8,r,r,B.j,r,r,B.Cb,B.cw,new A.d9(A.nn(12),B.m),r,r,r,r,r)))
@@ -76187,7 +76187,7 @@ aa0(a){var s=0,r=A.P(t.C),q,p,o,n,m,l,k
 var $async$lS=A.L(function(b,c){if(b===1)return A.M(c,r)
 while(true)switch(s){case 0:l=t.N
 s=3
-return A.T(A.aOu(A.ec("https://www.strava.com/oauth/token",0,null),A.aE(["client_id","167512","client_secret","6780c73a79c2380e2d3acb315a94c62ad6876cd3","code",a,"grant_type","authorization_code","redirect_uri","https://germain-ma.github.io/streakfreak/"],l,l)),$async$lS)
+return A.T(A.aOu(A.ec("https://www.strava.com/oauth/token",0,null),A.aE(["client_id","167512","client_secret","6780c73a79c2380e2d3acb315a94c62ad6876cd3","code",a,"grant_type","authorization_code","redirect_uri","https://germain-ma.github.io/streakfreak"],l,l)),$async$lS)
 case 3:k=c
 s=k.b===200?4:6
 break
