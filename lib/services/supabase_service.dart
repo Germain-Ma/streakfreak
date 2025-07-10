@@ -15,17 +15,33 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
-  Future<void> uploadActivities(String stravaId, List<Activity> activities) async {
+  Future<void> uploadActivities(String stravaId, List<Activity> activities, {bool uploadIndividually = false}) async {
     await init();
-    final rows = activities.where((a) => a.id != null).map((a) => {
-      'strava_id': stravaId,
-      'activity_id': a.id,
-      'data': a.toJson(),
-    }).toList();
-    try {
-      await client.from('activities').upsert(rows, onConflict: 'strava_id,activity_id');
-    } catch (e) {
-      throw Exception('Supabase upload error: $e');
+    if (uploadIndividually) {
+      for (final activity in activities) {
+        try {
+          await client.from('activities').upsert([{
+            'strava_id': stravaId,
+            'activity_id': activity.id,
+            'data': activity.toJson(),
+          }], onConflict: 'strava_id,activity_id');
+        } catch (e) {
+          print('[Supabase upload error for activity ${activity.id}]: $e');
+        }
+      }
+    } else {
+      try {
+        await client.from('activities').upsert(
+          activities.where((a) => a.id != null).map((a) => {
+            'strava_id': stravaId,
+            'activity_id': a.id,
+            'data': a.toJson(),
+          }).toList(),
+          onConflict: 'strava_id,activity_id',
+        );
+      } catch (e) {
+        print('[Supabase upload error]: $e');
+      }
     }
   }
 
@@ -36,6 +52,7 @@ class SupabaseService {
       if (data == null || data is! List) return [];
       return data.map<Activity>((row) => Activity.fromJson(row['data'])).toList();
     } catch (e) {
+      print('[Supabase fetch error]: $e');
       throw Exception('Supabase fetch error: $e');
     }
   }

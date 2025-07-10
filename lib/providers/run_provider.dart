@@ -149,89 +149,41 @@ class RunProvider extends ChangeNotifier {
     List<String?> countryResults = List.filled(filteredActivities.length, null);
     int gpsDebugCount = 0;
 
-    // Process activities in batches for better progress tracking
-    const int batchSize = 50;
-    int webGeoRequests = 0;
-    DateTime lastWebGeoRequest = DateTime.now().subtract(const Duration(seconds: 1));
-    for (int batchStart = 0; batchStart < filteredActivities.length; batchStart += batchSize) {
-      final batchEnd = (batchStart + batchSize < filteredActivities.length)
-          ? batchStart + batchSize
-          : filteredActivities.length;
-
-      for (int i = batchStart; i < batchEnd; i++) {
-        final a = filteredActivities[i];
-        final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
-        final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
-        Future<void> countryFuture;
-        if ((startLat != 0.0 || startLon != 0.0) && gpsDebugCount < 5) {
-          if (kIsWeb) {
-            // Throttle to 2 requests/sec for LocationIQ free tier
-            final now = DateTime.now();
-            final msSinceLast = now.difference(lastWebGeoRequest).inMilliseconds;
-            if (msSinceLast < 500) {
-              await Future.delayed(Duration(milliseconds: 500 - msSinceLast));
-            }
-            lastWebGeoRequest = DateTime.now();
-            webGeoRequests++;
-          }
-          countryFuture = ((kIsWeb
-              ? _webGeocodingService.countryFromLatLon(startLat, startLon)
-              : _geocodingService.countryFromLatLon(startLat, startLon))
-            .then((country) {
-              print('[DEBUG] GPS: ($startLat, $startLon) -> Country: $country');
-              countryResults[i] = country;
-            })
-            .catchError((e) {
-              print('[WARN] Geocoding failed for ($startLat, $startLon): $e');
-              countryResults[i] = null;
-            }));
-          gpsDebugCount++;
-        } else if (startLat != 0.0 || startLon != 0.0) {
-          if (kIsWeb) {
-            // Throttle to 2 requests/sec for LocationIQ free tier
-            final now = DateTime.now();
-            final msSinceLast = now.difference(lastWebGeoRequest).inMilliseconds;
-            if (msSinceLast < 500) {
-              await Future.delayed(Duration(milliseconds: 500 - msSinceLast));
-            }
-            lastWebGeoRequest = DateTime.now();
-            webGeoRequests++;
-          }
-          countryFuture = ((kIsWeb
-              ? _webGeocodingService.countryFromLatLon(startLat, startLon)
-              : _geocodingService.countryFromLatLon(startLat, startLon))
-            .then((country) {
-              countryResults[i] = country;
-            })
-            .catchError((e) {
-              print('[WARN] Geocoding failed for ($startLat, $startLon): $e');
-              countryResults[i] = null;
-            }));
-        } else {
-          countryFuture = Future.value();
-        }
-        countryFutures.add(countryFuture);
-      }
-
-      // Wait for current batch to complete
-      await Future.wait(countryFutures);
-      countryFutures.clear();
-
-      // Update progress
-      _importProgress = batchEnd;
-      _importStatus = 'Processing activities... (${_importProgress}/${_importTotal})';
-      notifyListeners();
-    }
-
-    _importStatus = 'Creating activity records...';
-    notifyListeners();
-
-    // Create activity records
+    // Cache for geocoding results
+    final Map<String, String?> geoCache = {};
+    final List<String> geoFailures = [];
+    // Process activities one by one for smooth progress
     for (int i = 0; i < filteredActivities.length; i++) {
       final a = filteredActivities[i];
       final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
       final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
-      final country = countryResults[i];
+      String? country;
+      String coordKey = '$startLat,$startLon';
+      if (startLat != 0.0 || startLon != 0.0) {
+        if (geoCache.containsKey(coordKey)) {
+          country = geoCache[coordKey];
+        } else {
+          int attempts = 0;
+          while (attempts < 3) {
+            try {
+              country = await (kIsWeb
+                ? _webGeocodingService.countryFromLatLon(startLat, startLon)
+                : _geocodingService.countryFromLatLon(startLat, startLon));
+              geoCache[coordKey] = country;
+              if (country != null) break;
+            } catch (e) {
+              attempts++;
+              if (attempts >= 3) {
+                geoFailures.add(coordKey);
+                geoCache[coordKey] = null;
+                print('[WARN] Geocoding failed for ($startLat, $startLon) after 3 attempts: $e');
+              } else {
+                await Future.delayed(const Duration(seconds: 1));
+              }
+            }
+          }
+        }
+      }
       final distanceMeters = (a['distance'] ?? 0).toString();
       final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
       final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
@@ -256,6 +208,16 @@ class RunProvider extends ChangeNotifier {
         'Max Heart Rate': maxHeartRate ?? '',
       };
       newActivities.add(Activity(fields));
+      _importProgress = i + 1;
+      _importStatus = 'Processing activities... (${_importProgress}/${_importTotal})';
+      notifyListeners();
+      // Throttle for LocationIQ (2/sec)
+      if (kIsWeb && (startLat != 0.0 || startLon != 0.0)) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    }
+    if (geoFailures.isNotEmpty) {
+      print('[Geocoding failures]: ${geoFailures.length} coordinates could not be resolved.');
     }
 
     _importStatus = 'Saving activities...';
@@ -263,8 +225,8 @@ class RunProvider extends ChangeNotifier {
 
     _activities = newActivities;
     await _storageService.saveActivities(_athleteId!, _activities);
-    // Upload to Supabase
-    await _supabaseService.uploadActivities(_athleteId!, _activities);
+    // Upload to Supabase (one by one)
+    await _supabaseService.uploadActivities(_athleteId!, _activities, uploadIndividually: true);
 
     _importStatus = 'Finalizing...';
     notifyListeners();

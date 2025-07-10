@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:country_coder/country_coder.dart';
 
 class WebGeocodingService {
   Future<({double lat, double lon})?> lookup(String place) async {
@@ -25,20 +26,9 @@ class WebGeocodingService {
   }
 
   Future<String?> countryFromLatLon(double lat, double lon) async {
-    // Use LocationIQ for web geocoding
-    final apiKey = 'pk.52d4e1ed1762aa7d94d7ecfb690595d2';
-    final url = Uri.parse(
-      'https://us1.locationiq.com/v1/reverse?key=$apiKey&lat=$lat&lon=$lon&format=json'
-    );
-    final response = await http.get(url, headers: {
-      'User-Agent': 'streakfreak-app/1.0 (your@email.com)'
-    });
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data is Map && data['address'] != null && data['address']['country'] != null) {
-        return data['address']['country'] as String;
-      }
-    }
-    return null;
+    // Use offline country_coder for country lookup
+    CountryCoder.instance.load(); // Safe to call multiple times
+    final code = CountryCoder.instance.iso1A2Code(lon: lon, lat: lat);
+    return code;
   }
 } 
