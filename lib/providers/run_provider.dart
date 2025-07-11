@@ -138,8 +138,20 @@ class RunProvider extends ChangeNotifier {
     // Build set of known Strava IDs
     final Set<String> knownIds = existingById.keys.toSet();
 
-    // Fetch activities from Strava, stopping early if all are known
-    final stravaActivities = await _stravaService.fetchActivities(knownIds: knownIds);
+    // Find the latest activity date in the database
+    DateTime? latestDate;
+    for (final a in existingById.values) {
+      final dateStr = a.fields['Date'];
+      if (dateStr != null && dateStr.isNotEmpty) {
+        final d = DateTime.tryParse(dateStr);
+        if (d != null && (latestDate == null || d.isAfter(latestDate))) {
+          latestDate = d;
+        }
+      }
+    }
+
+    // Fetch activities from Strava, only after the latest date
+    final stravaActivities = await _stravaService.fetchActivities(knownIds: knownIds, after: latestDate);
     final filteredActivities = stravaActivities.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
       return type == 'run' || type == 'trailrun';
