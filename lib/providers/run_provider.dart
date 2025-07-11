@@ -135,7 +135,11 @@ class RunProvider extends ChangeNotifier {
       }
     }
 
-    final stravaActivities = await _stravaService.fetchActivities();
+    // Build set of known Strava IDs
+    final Set<String> knownIds = existingById.keys.toSet();
+
+    // Fetch activities from Strava, stopping early if all are known
+    final stravaActivities = await _stravaService.fetchActivities(knownIds: knownIds);
     final filteredActivities = stravaActivities.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
       return type == 'run' || type == 'trailrun';
@@ -143,42 +147,47 @@ class RunProvider extends ChangeNotifier {
 
     // Only import new activities (not already in existingById)
     List<Activity> newActivities = [];
+    List<String> importErrors = [];
     for (int i = 0; i < filteredActivities.length; i++) {
-      final a = filteredActivities[i];
-      final stravaId = (a['id'] ?? '').toString();
-      if (stravaId.isEmpty || existingById.containsKey(stravaId)) {
-        continue;
+      try {
+        final a = filteredActivities[i];
+        final stravaId = (a['id'] ?? '').toString();
+        if (stravaId.isEmpty || existingById.containsKey(stravaId)) {
+          continue;
+        }
+        final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
+        final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
+        final distanceMeters = (a['distance'] ?? 0).toString();
+        final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
+        final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
+        final avgHeartRate = a['average_heartrate']?.toString();
+        final maxHeartRate = a['max_heartrate']?.toString();
+        final fields = <String, String>{
+          'Activity Type': (a['type'] ?? '').toString(),
+          'Date': dateLocal,
+          'Distance': distanceKm,
+          'Title': (a['name'] ?? '').toString(),
+          'Start Latitude': startLat.toString(),
+          'Start Longitude': startLon.toString(),
+          'Strava ID': stravaId,
+          'Elevation Gain': (a['total_elevation_gain'] ?? '').toString(),
+          'Moving Time': (a['moving_time'] ?? '').toString(),
+          'Elapsed Time': (a['elapsed_time'] ?? '').toString(),
+          'Average Speed': (a['average_speed'] ?? '').toString(),
+          'Max Speed': (a['max_speed'] ?? '').toString(),
+          'Calories': (a['calories'] ?? '').toString(),
+          'Avg Heart Rate': avgHeartRate ?? '',
+          'Max Heart Rate': maxHeartRate ?? '',
+        };
+        final activity = Activity(fields);
+        newActivities.add(activity);
+        _importProgress = newActivities.length;
+        _importTotal = filteredActivities.length;
+        _importStatus = 'Syncing new activities from Strava... ($_importProgress/$_importTotal)';
+        notifyListeners();
+      } catch (e) {
+        importErrors.add('Error importing activity at index $i: $e');
       }
-      final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
-      final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
-      final distanceMeters = (a['distance'] ?? 0).toString();
-      final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
-      final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
-      final avgHeartRate = a['average_heartrate']?.toString();
-      final maxHeartRate = a['max_heartrate']?.toString();
-      final fields = <String, String>{
-        'Activity Type': (a['type'] ?? '').toString(),
-        'Date': dateLocal,
-        'Distance': distanceKm,
-        'Title': (a['name'] ?? '').toString(),
-        'Start Latitude': startLat.toString(),
-        'Start Longitude': startLon.toString(),
-        'Strava ID': stravaId,
-        'Elevation Gain': (a['total_elevation_gain'] ?? '').toString(),
-        'Moving Time': (a['moving_time'] ?? '').toString(),
-        'Elapsed Time': (a['elapsed_time'] ?? '').toString(),
-        'Average Speed': (a['average_speed'] ?? '').toString(),
-        'Max Speed': (a['max_speed'] ?? '').toString(),
-        'Calories': (a['calories'] ?? '').toString(),
-        'Avg Heart Rate': avgHeartRate ?? '',
-        'Max Heart Rate': maxHeartRate ?? '',
-      };
-      final activity = Activity(fields);
-      newActivities.add(activity);
-      _importProgress = newActivities.length;
-      _importTotal = filteredActivities.length;
-      _importStatus = 'Syncing new activities from Strava... ($_importProgress/$_importTotal)';
-      notifyListeners();
     }
 
     final allActivities = [...existingById.values, ...newActivities];
@@ -201,10 +210,10 @@ class RunProvider extends ChangeNotifier {
     _importStatus = 'Finalizing...';
     notifyListeners();
 
-    // Only print a summary log
-    if (newActivities.isNotEmpty) {
+    // Only print a single summary log at the end
+    if (newActivities.isNotEmpty || importErrors.isNotEmpty) {
       // ignore: avoid_print
-      print('[Import Summary] Imported ${newActivities.length} new activities. Total now: ${_activities.length}');
+      print('[Import Summary] Imported ${newActivities.length} new activities. Total now: ${_activities.length}. Errors: ${importErrors.length}${importErrors.isNotEmpty ? ":\n" + importErrors.join("\n") : ""}');
     }
     _isImporting = false;
     _importProgress = 0;

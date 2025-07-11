@@ -55,13 +55,14 @@ class StravaService {
     return prefs.getString('strava_access_token');
   }
 
-  Future<List<Map<String, dynamic>>> fetchActivities() async {
+  Future<List<Map<String, dynamic>>> fetchActivities({Set<String>? knownIds}) async {
     final accessToken = await getAccessToken();
     if (accessToken == null) return [];
     List<Map<String, dynamic>> allActivities = [];
     int page = 1;
     const int perPage = 200;
-    while (true) {
+    bool allKnown = false;
+    while (!allKnown) {
       final url = '$activitiesUrl?per_page=$perPage&page=$page';
       final response = await http.get(
         Uri.parse(url),
@@ -70,7 +71,12 @@ class StravaService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is List && data.isNotEmpty) {
-          allActivities.addAll(List<Map<String, dynamic>>.from(data));
+          final pageActivities = List<Map<String, dynamic>>.from(data);
+          allActivities.addAll(pageActivities);
+          if (knownIds != null && pageActivities.every((a) => knownIds.contains((a['id'] ?? '').toString()))) {
+            allKnown = true;
+            break;
+          }
           if (data.length < perPage) break; // Last page
           page++;
         } else {
