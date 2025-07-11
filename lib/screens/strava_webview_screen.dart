@@ -85,18 +85,15 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
   }
 
   Future<void> _handleStravaRedirect(String url) async {
-    print('[StravaWebViewScreen] _handleStravaRedirect called with url: $url');
     final uri = Uri.parse(url);
     final code = uri.queryParameters['code'];
     final state = uri.queryParameters['state'];
-    print('[StravaWebViewScreen] code param: $code, state param: $state');
     setState(() => _isLoading = true);
     if (code == null || code.isEmpty) {
-      print('[StravaWebViewScreen] ERROR: code param is missing or empty in _handleStravaRedirect. Uri: $uri, query params: ${uri.queryParameters}');
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: Missing code parameter in Strava redirect. Please try again.')),
       );
+      setState(() => _isLoading = false);
       return;
     }
     try {
@@ -126,8 +123,8 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
         });
         widget.onImportComplete(_total, _gps);
       } else {
-        // Handle error
         setState(() => _isLoading = false);
+        // ignore: avoid_print
         print('[StravaWebViewScreen] ERROR: Failed to connect to Strava: ${token ?? "Unknown error"}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to connect to Strava: ${token ?? "Unknown error"}')),
@@ -135,7 +132,9 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       }
     } catch (e, stack) {
       setState(() => _isLoading = false);
+      // ignore: avoid_print
       print('[StravaWebViewScreen] Error importing from Strava: $e');
+      // ignore: avoid_print
       print('[StravaWebViewScreen] Stack trace: $stack');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error importing from Strava: $e')),

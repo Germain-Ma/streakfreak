@@ -29,7 +29,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('[HomeScreen] build called');
     return Scaffold(
       appBar: AppBar(
         title: const Text('StreakFreak'),

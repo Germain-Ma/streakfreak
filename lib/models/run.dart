@@ -31,19 +31,16 @@ class Run {
   });
 
   static Run? fromCsv(Map<String, String> row) {
-    print('[Run.fromCsv] called with row: $row');
-    // --- BEGIN SKIPPED RUNS DEBUG ---
+    // Removed all print/debug statements for performance
     try {
       final dateStr = row['Date'];
       if (dateStr == null || dateStr.isEmpty) {
-        print('[Run.fromCsv] SKIPPED (missing date): $row');
         return null;
       }
       DateTime? date;
       try {
         date = DateTime.parse(dateStr);
       } catch (_) {
-        print('[Run.fromCsv] SKIPPED (invalid date "$dateStr"): $row');
         return null;
       }
       final distanceKm = double.tryParse(row['Distance'] ?? '') ?? 0.0;
@@ -76,10 +73,8 @@ class Run {
         maxHeartRate: maxHeartRate,
       );
     } catch (e) {
-      print('[Run.fromCsv] SKIPPED (parse error): $row, error: $e');
       return null;
     }
-    // --- END SKIPPED RUNS DEBUG ---
   }
 
   Map<String, dynamic> toJson() => {

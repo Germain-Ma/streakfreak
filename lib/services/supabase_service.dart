@@ -26,6 +26,7 @@ class SupabaseService {
             'data': activity.toJson(),
           }], onConflict: 'strava_id,activity_id');
         } catch (e) {
+          // ignore: avoid_print
           print('[Supabase upload error for activity ${activity.id}]: $e');
         }
       }
@@ -40,6 +41,7 @@ class SupabaseService {
           onConflict: 'strava_id,activity_id',
         );
       } catch (e) {
+        // ignore: avoid_print
         print('[Supabase upload error]: $e');
       }
     }
@@ -52,6 +54,7 @@ class SupabaseService {
       if (data == null || data is! List) return [];
       return data.map<Activity>((row) => Activity.fromJson(row['data'])).toList();
     } catch (e) {
+      // ignore: avoid_print
       print('[Supabase fetch error]: $e');
       throw Exception('Supabase fetch error: $e');
     }
