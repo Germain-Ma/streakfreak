@@ -39,10 +39,10 @@ class StreakScreen extends StatelessWidget {
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    child: Column(
+      child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
+        children: [
                         Text(
                           'Current Streak',
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white),
@@ -108,8 +108,8 @@ class StreakScreen extends StatelessWidget {
                       alignment: Alignment.centerRight,
                       child: Text(row[1].toString(), style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.white)),
                     ),
-                  ),
-                ],
+          ),
+        ],
               ),
           ],
         ),

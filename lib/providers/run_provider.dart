@@ -132,6 +132,27 @@ class RunProvider extends ChangeNotifier {
     print('--- END DEBUG ---');
   }
 
+  /// Remove duplicates from activities list, keeping the most recent version
+  List<Activity> _removeDuplicates(List<Activity> activities) {
+    final Map<String, Activity> uniqueById = {};
+    for (final activity in activities) {
+      if (activity.id != null && activity.id!.isNotEmpty) {
+        // If we already have this ID, keep the one with the most recent date
+        if (uniqueById.containsKey(activity.id)) {
+          final existing = uniqueById[activity.id]!;
+          final existingDate = DateTime.tryParse(existing.fields['Date'] ?? '') ?? DateTime(1900);
+          final newDate = DateTime.tryParse(activity.fields['Date'] ?? '') ?? DateTime(1900);
+          if (newDate.isAfter(existingDate)) {
+            uniqueById[activity.id!] = activity;
+          }
+        } else {
+          uniqueById[activity.id!] = activity;
+        }
+      }
+    }
+    return uniqueById.values.toList();
+  }
+
   /// Import activities from Strava API
   Future<void> importFromStrava() async {
     print('[importFromStrava] ENTERED, athleteId:  [36m$_athleteId [0m');
@@ -151,6 +172,26 @@ class RunProvider extends ChangeNotifier {
       return;
     }
 
+    // Fetch existing activities from Supabase and local storage
+    print('[importFromStrava] Fetching existing activities from Supabase...');
+    final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
+    print('[importFromStrava] Fetching existing activities from local storage...');
+    final localActivities = await _storageService.loadActivities(_athleteId!);
+    
+    // Remove duplicates from existing activities and merge
+    final allExisting = [...cloudActivities, ...localActivities];
+    final deduplicatedExisting = _removeDuplicates(allExisting);
+    print('[importFromStrava] Existing activities after deduplication: ${deduplicatedExisting.length}');
+    
+    // Create lookup map for existing activities
+    final Map<String, Activity> existingById = {};
+    for (final a in deduplicatedExisting) {
+      if (a.id != null && a.id!.isNotEmpty) {
+        existingById[a.id!] = a;
+      }
+    }
+    print('[importFromStrava] Existing activity IDs: ${existingById.keys.length}');
+
     print('[importFromStrava] Fetching activities from Strava...');
     final stravaActivities = await _stravaService.fetchActivities();
     print('[importFromStrava] Activities fetched: ${stravaActivities.length}');
@@ -160,14 +201,15 @@ class RunProvider extends ChangeNotifier {
     }).toList();
     print('[importFromStrava] Filtered activities: ${filteredActivities.length}');
 
-    _importTotal = filteredActivities.length;
-    _importStatus = 'Syncing activities from Strava... (${_importProgress}/${_importTotal})';
-    notifyListeners();
-
-    // Remove all country lookup and assignment logic
+    // Only import new activities (not already in existingById)
     List<Activity> newActivities = [];
     for (int i = 0; i < filteredActivities.length; i++) {
       final a = filteredActivities[i];
+      final stravaId = (a['id'] ?? '').toString();
+      if (stravaId.isEmpty || existingById.containsKey(stravaId)) {
+        // Skip already imported
+        continue;
+      }
       final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
       final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
       final distanceMeters = (a['distance'] ?? 0).toString();
@@ -182,35 +224,45 @@ class RunProvider extends ChangeNotifier {
         'Title': (a['name'] ?? '').toString(),
         'Start Latitude': startLat.toString(),
         'Start Longitude': startLon.toString(),
-        'Strava ID': (a['id'] ?? '').toString(),
+        'Strava ID': stravaId,
         'Elevation Gain': (a['total_elevation_gain'] ?? '').toString(),
         'Moving Time': (a['moving_time'] ?? '').toString(),
         'Elapsed Time': (a['elapsed_time'] ?? '').toString(),
         'Average Speed': (a['average_speed'] ?? '').toString(),
         'Max Speed': (a['max_speed'] ?? '').toString(),
         'Calories': (a['calories'] ?? '').toString(),
-        // 'Country': country ?? '',
         'Avg Heart Rate': avgHeartRate ?? '',
         'Max Heart Rate': maxHeartRate ?? '',
       };
-      newActivities.add(Activity(fields));
-      _importProgress = i + 1;
-      _importStatus = 'Syncing activities from Strava... (${_importProgress}/${_importTotal})';
+      final activity = Activity(fields);
+      newActivities.add(activity);
+      _importProgress = newActivities.length;
+      _importTotal = filteredActivities.length;
+      _importStatus = 'Syncing new activities from Strava... (${_importProgress}/${_importTotal})';
       if (i % 100 == 0) print('[importFromStrava] Processed activity $i/${filteredActivities.length}');
       notifyListeners();
     }
-    print('[importFromStrava] All activities processed.');
+    print('[importFromStrava] New activities to import: ${newActivities.length}');
 
-    _importStatus = 'Uploading to cloud...';
+    // Merge new and existing activities, then remove any duplicates
+    final allActivities = [...existingById.values, ...newActivities];
+    final finalActivities = _removeDuplicates(allActivities);
+    print('[importFromStrava] Final activities after deduplication: ${finalActivities.length}');
+
+    _importStatus = 'Uploading new activities to cloud...';
     notifyListeners();
     _isSyncingCloud = true;
     try {
-      _activities = newActivities;
-      print('[importFromStrava] Saving activities locally...');
+      _activities = finalActivities;
+      print('[importFromStrava] Saving all activities locally...');
       await _storageService.saveActivities(_athleteId!, _activities);
-      print('[importFromStrava] Uploading activities to Supabase...');
-      await _supabaseService.uploadActivities(_athleteId!, _activities);
-      print('[importFromStrava] Upload complete.');
+      if (newActivities.isNotEmpty) {
+        print('[importFromStrava] Uploading new activities to Supabase...');
+        await _supabaseService.uploadActivities(_athleteId!, newActivities);
+        print('[importFromStrava] Upload complete.');
+      } else {
+        print('[importFromStrava] No new activities to upload.');
+      }
     } finally {
       _isSyncingCloud = false;
       notifyListeners();
@@ -221,7 +273,6 @@ class RunProvider extends ChangeNotifier {
 
     debugPrintAllActivities();
     print('[importFromStrava] END');
-    // Remove country statistics debug output
     _isImporting = false;
     _importProgress = 0;
     _importTotal = 0;

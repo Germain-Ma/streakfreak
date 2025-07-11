@@ -73,7 +73,7 @@ class _MyAppState extends State<MyApp> {
       ],
       child: MaterialApp(
         title: 'StreakFreak',
-        theme: ThemeData(
+      theme: ThemeData(
           brightness: Brightness.dark,
           fontFamily: 'Roboto',
           scaffoldBackgroundColor: const Color(0xFF181A20),
@@ -103,7 +103,7 @@ class _MyAppState extends State<MyApp> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
-        ),
+      ),
         home: Stack(
           children: [
             _stravaConnected

@@ -25,12 +25,12 @@ class LocationProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-
+    
     print('[LocationProvider.refresh] Starting GPS extraction...');
     print('Processing ${_runProvider!.runs.length} runs for GPS extraction...');
     int withGps = 0;
     int withoutGps = 0;
-
+    
     for (final run in _runProvider!.runs) {
       if ((run.lat != 0.0 || run.lon != 0.0)) {
         withGps++;

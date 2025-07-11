@@ -123,7 +123,7 @@ class Run {
     }
     return '';
   }
-  
+
   /// Smart location extraction using multiple heuristics
   String _extractLocationSmart(String title) {
     // Common running keywords to filter out
