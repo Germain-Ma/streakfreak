@@ -7,7 +7,19 @@ import 'screens/map_screen.dart';
 import 'screens/strava_webview_screen.dart';
 
 void main() async {
+  print('[main.dart] TOP OF FILE');
+  print('[main.dart] App started at:  [32m${Uri.base.toString()} [0m');
+  print('[main.dart] Uri.base: ${Uri.base}');
+  print('[main.dart] Query params: ${Uri.base.queryParameters}');
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.dumpErrorToConsole(details);
+    print('[GLOBAL ERROR]  [31m${details.exceptionAsString()} [0m');
+    if (details.stack != null) {
+      print('[GLOBAL ERROR STACK] ${details.stack}');
+    }
+  };
+  print('[main.dart] Before runApp');
   runApp(const MyApp());
 }
 
@@ -39,12 +51,20 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    print('[_MyAppState] build called');
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => RunProvider()..loadRuns()),
+        ChangeNotifierProvider(create: (_) {
+          print('[main.dart] Creating RunProvider');
+          return RunProvider()..loadRuns();
+        }),
         ChangeNotifierProxyProvider<RunProvider, LocationProvider>(
-          create: (_) => LocationProvider(null),
+          create: (_) {
+            print('[main.dart] Creating LocationProvider(null)');
+            return LocationProvider(null);
+          },
           update: (_, runProv, prev) {
+            print('[main.dart] Updating LocationProvider with runProv: $runProv');
             if (prev == null) return LocationProvider(runProv);
             prev.updateRunProvider(runProv);
             return prev;

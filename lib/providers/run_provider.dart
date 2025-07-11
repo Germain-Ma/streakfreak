@@ -5,8 +5,9 @@ import '../services/csv_service.dart';
 import '../services/storage_service.dart';
 import 'package:intl/intl.dart';
 import '../services/strava_service.dart';
-import '../services/geocoding_service.dart';
-import '../services/web_geocoding_service.dart';
+// Remove geocoding imports
+// import '../services/geocoding_service.dart';
+// import '../services/web_geocoding_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/supabase_service.dart';
 
@@ -14,8 +15,9 @@ class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
   final StorageService _storageService = StorageService();
   final StravaService _stravaService = StravaService();
-  final GeocodingService _geocodingService = GeocodingService();
-  final WebGeocodingService _webGeocodingService = WebGeocodingService();
+  // Remove geocoding service fields
+  // final GeocodingService _geocodingService = GeocodingService();
+  // final WebGeocodingService _webGeocodingService = WebGeocodingService();
   final SupabaseService _supabaseService = SupabaseService();
   StravaService get stravaService => _stravaService;
   List<Activity> _activities = [];
@@ -37,6 +39,7 @@ class RunProvider extends ChangeNotifier {
   List<Activity> get activities => _activities;
 
   List<Run> get runs {
+    print('[RunProvider.runs] getter called, _activities.length: ${_activities.length}');
     runsGetterCallCount++;
     if (runsGetterCallCount == 1) {
       print('Total activities: ' + _activities.length.toString());
@@ -71,6 +74,7 @@ class RunProvider extends ChangeNotifier {
 
   // Computed stats
   int get streak {
+    print('[RunProvider.streak] getter called');
     final r = runs;
     if (r.isEmpty) return 0;
     r.sort((a, b) => b.date.compareTo(a.date));
@@ -86,9 +90,15 @@ class RunProvider extends ChangeNotifier {
     return streak;
   }
 
-  double get totalKm => runs.fold(0.0, (sum, r) => sum + r.distanceKm);
+  double get totalKm {
+    print('[RunProvider.totalKm] getter called');
+    final r = runs;
+    if (r.isEmpty) return 0.0;
+    return r.fold(0.0, (sum, r) => sum + r.distanceKm);
+  }
 
   double get avgKmPerDay {
+    print('[RunProvider.avgKmPerDay] getter called');
     final r = runs;
     if (r.isEmpty) return 0.0;
     final days = r.last.date.difference(r.first.date).inDays + 1;
@@ -96,6 +106,7 @@ class RunProvider extends ChangeNotifier {
   }
 
   DateTime? get firstDay {
+    print('[RunProvider.firstDay] getter called');
     final r = runs;
     return r.isEmpty ? null : r.map((r) => r.date).reduce((a, b) => a.isBefore(b) ? a : b);
   }
@@ -123,6 +134,8 @@ class RunProvider extends ChangeNotifier {
 
   /// Import activities from Strava API
   Future<void> importFromStrava() async {
+    print('[importFromStrava] ENTERED, athleteId:  [36m$_athleteId [0m');
+    print('[importFromStrava] START');
     _isImporting = true;
     _importProgress = 0;
     _importTotal = 0;
@@ -130,82 +143,33 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
 
     await ensureAthleteId();
+    print('[importFromStrava] athleteId: $_athleteId');
     if (_athleteId == null) {
+      print('[importFromStrava] ERROR: Could not determine Strava athlete ID.');
       _importStatus = 'Could not determine Strava athlete ID.';
       notifyListeners();
       return;
     }
 
+    print('[importFromStrava] Fetching activities from Strava...');
     final stravaActivities = await _stravaService.fetchActivities();
+    print('[importFromStrava] Activities fetched: ${stravaActivities.length}');
     final filteredActivities = stravaActivities.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
       return type == 'run' || type == 'trailrun';
     }).toList();
+    print('[importFromStrava] Filtered activities: ${filteredActivities.length}');
 
     _importTotal = filteredActivities.length;
     _importStatus = 'Syncing activities from Strava... (${_importProgress}/${_importTotal})';
     notifyListeners();
 
-    // Bundle activities with very close GPS coordinates
-    const double epsilon = 0.01; // ~1km, adjust as needed
-    Map<String, List<int>> coordBundles = {};
-    List<Map<String, dynamic>> coords = [];
-    for (int i = 0; i < filteredActivities.length; i++) {
-      final a = filteredActivities[i];
-      final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
-      final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
-      bool bundled = false;
-      for (final entry in coordBundles.entries) {
-        final idx = entry.value.first;
-        final c = coords[idx];
-        if ((startLat - c['lat']).abs() < epsilon && (startLon - c['lon']).abs() < epsilon) {
-          entry.value.add(i);
-          bundled = true;
-          break;
-        }
-      }
-      if (!bundled) {
-        final key = '$startLat,$startLon';
-        coordBundles[key] = [i];
-        coords.add({'lat': startLat, 'lon': startLon});
-      }
-    }
-
-    // Now process each bundle for country lookup
-    Map<String, String?> bundleCountries = {};
-    int bundleIdx = 0;
-    for (final entry in coordBundles.entries) {
-      final key = entry.key;
-      final idx = entry.value.first;
-      final lat = coords[idx]['lat'];
-      final lon = coords[idx]['lon'];
-      String? country;
-      try {
-        country = await (kIsWeb
-          ? _webGeocodingService.countryFromLatLon(lat, lon)
-          : _geocodingService.countryFromLatLon(lat, lon));
-      } catch (e) {
-        country = null;
-      }
-      bundleCountries[key] = country;
-      bundleIdx++;
-    }
-
-    // Now assign country to each activity
+    // Remove all country lookup and assignment logic
     List<Activity> newActivities = [];
     for (int i = 0; i < filteredActivities.length; i++) {
       final a = filteredActivities[i];
       final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
       final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
-      String? country;
-      for (final entry in coordBundles.entries) {
-        final idx = entry.value.first;
-        final c = coords[idx];
-        if ((startLat - c['lat']).abs() < epsilon && (startLon - c['lon']).abs() < epsilon) {
-          country = bundleCountries[entry.key];
-          break;
-        }
-      }
       final distanceMeters = (a['distance'] ?? 0).toString();
       final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
       final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
@@ -225,24 +189,28 @@ class RunProvider extends ChangeNotifier {
         'Average Speed': (a['average_speed'] ?? '').toString(),
         'Max Speed': (a['max_speed'] ?? '').toString(),
         'Calories': (a['calories'] ?? '').toString(),
-        'Country': country ?? '',
+        // 'Country': country ?? '',
         'Avg Heart Rate': avgHeartRate ?? '',
         'Max Heart Rate': maxHeartRate ?? '',
       };
       newActivities.add(Activity(fields));
       _importProgress = i + 1;
       _importStatus = 'Syncing activities from Strava... (${_importProgress}/${_importTotal})';
+      if (i % 100 == 0) print('[importFromStrava] Processed activity $i/${filteredActivities.length}');
       notifyListeners();
     }
+    print('[importFromStrava] All activities processed.');
 
     _importStatus = 'Uploading to cloud...';
     notifyListeners();
     _isSyncingCloud = true;
     try {
       _activities = newActivities;
+      print('[importFromStrava] Saving activities locally...');
       await _storageService.saveActivities(_athleteId!, _activities);
-      // Upload all activities to Supabase in a single batch (background)
+      print('[importFromStrava] Uploading activities to Supabase...');
       await _supabaseService.uploadActivities(_athleteId!, _activities);
+      print('[importFromStrava] Upload complete.');
     } finally {
       _isSyncingCloud = false;
       notifyListeners();
@@ -252,22 +220,8 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
 
     debugPrintAllActivities();
-    // Debug output for country statistics
-    final runsList = runs;
-    final countryStats = <String, int>{};
-    for (final run in runsList) {
-      final country = run.country ?? '';
-      if (country.trim().isEmpty) continue;
-      countryStats[country] = (countryStats[country] ?? 0) + 1;
-    }
-    final sortedCountries = countryStats.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    print('--- DEBUG: Country Statistics ---');
-    for (final entry in sortedCountries) {
-      print('${entry.key}: ${entry.value}');
-    }
-    print('--- END COUNTRY DEBUG ---');
-
+    print('[importFromStrava] END');
+    // Remove country statistics debug output
     _isImporting = false;
     _importProgress = 0;
     _importTotal = 0;

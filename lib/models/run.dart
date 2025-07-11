@@ -11,7 +11,6 @@ class Run {
   final double maxSpeed;
   final int calories;
   final String stravaId;
-  final String? country;
   final double? avgHeartRate;
   final double? maxHeartRate;
   const Run({
@@ -27,14 +26,26 @@ class Run {
     required this.maxSpeed,
     required this.calories,
     required this.stravaId,
-    this.country,
     this.avgHeartRate,
     this.maxHeartRate,
   });
 
-  factory Run.fromCsv(Map<String, String> row) {
+  static Run? fromCsv(Map<String, String> row) {
+    print('[Run.fromCsv] called with row: $row');
+    // --- BEGIN SKIPPED RUNS DEBUG ---
     try {
-      final date = DateTime.parse(row['Date']!);
+      final dateStr = row['Date'];
+      if (dateStr == null || dateStr.isEmpty) {
+        print('[Run.fromCsv] SKIPPED (missing date): $row');
+        return null;
+      }
+      DateTime? date;
+      try {
+        date = DateTime.parse(dateStr);
+      } catch (_) {
+        print('[Run.fromCsv] SKIPPED (invalid date "$dateStr"): $row');
+        return null;
+      }
       final distanceKm = double.tryParse(row['Distance'] ?? '') ?? 0.0;
       final title = row['Title'] ?? '';
       final lat = double.tryParse(row['Start Latitude'] ?? '') ?? 0.0;
@@ -46,7 +57,6 @@ class Run {
       final maxSpeed = double.tryParse(row['Max Speed'] ?? '') ?? 0.0;
       final calories = int.tryParse(row['Calories'] ?? '') ?? 0;
       final stravaId = row['Strava ID'] ?? '';
-      final country = row['Country'];
       final avgHeartRate = double.tryParse(row['Avg Heart Rate'] ?? '');
       final maxHeartRate = double.tryParse(row['Max Heart Rate'] ?? '');
       return Run(
@@ -62,14 +72,14 @@ class Run {
         maxSpeed: maxSpeed,
         calories: calories,
         stravaId: stravaId,
-        country: country,
         avgHeartRate: avgHeartRate,
         maxHeartRate: maxHeartRate,
       );
     } catch (e) {
-      print('Failed to parse Run from row: $row, error: $e');
-      rethrow;
+      print('[Run.fromCsv] SKIPPED (parse error): $row, error: $e');
+      return null;
     }
+    // --- END SKIPPED RUNS DEBUG ---
   }
 
   Map<String, dynamic> toJson() => {
@@ -85,7 +95,6 @@ class Run {
         'ms': maxSpeed,
         'c': calories,
         'sid': stravaId,
-        'country': country,
         'ahr': avgHeartRate,
         'mhr': maxHeartRate,
       };
@@ -103,7 +112,6 @@ class Run {
         maxSpeed: (j['ms'] as num?)?.toDouble() ?? 0.0,
         calories: (j['c'] as num?)?.toInt() ?? 0,
         stravaId: j['sid'] ?? '',
-        country: j['country'],
         avgHeartRate: (j['ahr'] as num?)?.toDouble(),
         maxHeartRate: (j['mhr'] as num?)?.toDouble(),
       );

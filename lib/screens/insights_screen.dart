@@ -82,13 +82,13 @@ class InsightsScreen extends StatelessWidget {
       return {'label': '${weekStart.year}-${weekStart.weekday}', 'km': weekKm};
     });
 
-    // Country statistics (dummy for now)
-    final countryStats = <String, int>{};
-    for (final r in runs) {
-      final country = r.country ?? 'Unknown';
-      countryStats[country] = (countryStats[country] ?? 0) + 1;
-    }
-    final sortedCountries = countryStats.keys.toList()..sort((a, b) => countryStats[b]!.compareTo(countryStats[a]!));
+    // Remove country statistics (dummy for now)
+    // final countryStats = <String, int>{};
+    // for (final r in runs) {
+    //   final country = r.country ?? 'Unknown';
+    //   countryStats[country] = (countryStats[country] ?? 0) + 1;
+    // }
+    // final sortedCountries = countryStats.keys.toList()..sort((a, b) => countryStats[b]!.compareTo(countryStats[a]!));
 
     return Scaffold(
       backgroundColor: const Color(0xFF181A20),
@@ -251,15 +251,15 @@ class InsightsScreen extends StatelessWidget {
               ]),
               const SizedBox(height: 32),
               // 10. Country statistics
-              _buildStatsTable('Country statistics', [
-                ['Country', 'Activities'],
-                ...(
-                  countryStats.entries
-                    .where((e) => (e.key != null && e.key.trim().isNotEmpty))
-                    .toList()
-                    ..sort((a, b) => b.value.compareTo(a.value))
-                ).map((e) => [e.key, e.value]),
-              ]),
+              // _buildStatsTable('Country statistics', [
+              //   ['Country', 'Activities'],
+              //   ...(
+              //     countryStats.entries
+              //       .where((e) => (e.key != null && e.key.trim().isNotEmpty))
+              //       .toList()
+              //       ..sort((a, b) => b.value.compareTo(a.value))
+              //   ).map((e) => [e.key, e.value]),
+              // ]),
               const SizedBox(height: 64),
             ],
           ),

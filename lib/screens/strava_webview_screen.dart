@@ -11,7 +11,9 @@ import 'dart:html' as html;
 
 class StravaWebViewScreen extends StatefulWidget {
   final void Function(int total, int gps) onImportComplete;
-  const StravaWebViewScreen({super.key, required this.onImportComplete});
+  StravaWebViewScreen({super.key, required this.onImportComplete}) {
+    print('[StravaWebViewScreen] constructor called');
+  }
 
   @override
   State<StravaWebViewScreen> createState() => _StravaWebViewScreenState();
@@ -54,6 +56,7 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
 
   @override
   void initState() {
+    print('[StravaWebViewScreen] initState called');
     super.initState();
     if (!kIsWeb) {
       _controller = WebViewController()
@@ -68,55 +71,75 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
     } else {
       // On web, check for code in URL
       final code = Uri.base.queryParameters['code'];
-      if (code != null && !_isSuccess) {
+      final state = Uri.base.queryParameters['state'];
+      print('[StravaWebViewScreen] initState code param: $code, state param: $state');
+      if (code == null || code.isEmpty) {
+        print('[StravaWebViewScreen] ERROR: code param is missing or empty. Uri.base:  [33m${Uri.base} [0m, query params: ${Uri.base.queryParameters}');
+        // Optionally show a user-friendly error here
+        return;
+      }
+      if (!_isSuccess) {
         _handleStravaRedirect(html.window.location.href);
       }
     }
   }
 
   Future<void> _handleStravaRedirect(String url) async {
+    print('[StravaWebViewScreen] _handleStravaRedirect called with url: $url');
+    final uri = Uri.parse(url);
+    final code = uri.queryParameters['code'];
+    final state = uri.queryParameters['state'];
+    print('[StravaWebViewScreen] code param: $code, state param: $state');
     setState(() => _isLoading = true);
-    final code = Uri.parse(url).queryParameters['code'];
-    if (code != null) {
-      try {
-        // Exchange code for token
-        final token = await _stravaService.exchangeCodeForToken(code);
-        if (token != null && !token.startsWith('Error:')) {
-          // Import activities from Strava
-          final runProvider = context.read<RunProvider>();
-          await runProvider.importFromStrava();
-          // Wait for GPS extraction
-          final locationProvider = context.read<LocationProvider>();
-          await locationProvider.refresh();
-          // Count total and GPS activities
-          final activities = runProvider.activities;
-          final runs = runProvider.runs;
-          int gpsCount = 0;
-          for (final run in runs) {
-            if (run.lat != 0.0 || run.lon != 0.0) {
-              gpsCount++;
-            }
+    if (code == null || code.isEmpty) {
+      print('[StravaWebViewScreen] ERROR: code param is missing or empty in _handleStravaRedirect. Uri: $uri, query params: ${uri.queryParameters}');
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: Missing code parameter in Strava redirect. Please try again.')),
+      );
+      return;
+    }
+    try {
+      // Exchange code for token
+      final token = await _stravaService.exchangeCodeForToken(code);
+      if (token != null && !token.startsWith('Error:')) {
+        // Import activities from Strava
+        final runProvider = context.read<RunProvider>();
+        await runProvider.importFromStrava();
+        // Wait for GPS extraction
+        final locationProvider = context.read<LocationProvider>();
+        await locationProvider.refresh();
+        // Count total and GPS activities
+        final activities = runProvider.activities;
+        final runs = runProvider.runs;
+        int gpsCount = 0;
+        for (final run in runs) {
+          if (run.lat != 0.0 || run.lon != 0.0) {
+            gpsCount++;
           }
-          setState(() {
-            _isSuccess = true;
-            _isLoading = false;
-            _total = activities.length;
-            _gps = gpsCount;
-          });
-          widget.onImportComplete(_total, _gps);
-        } else {
-          // Handle error
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to connect to Strava: ${token ?? "Unknown error"}')),
-          );
         }
-      } catch (e) {
+        setState(() {
+          _isSuccess = true;
+          _isLoading = false;
+          _total = activities.length;
+          _gps = gpsCount;
+        });
+        widget.onImportComplete(_total, _gps);
+      } else {
+        // Handle error
         setState(() => _isLoading = false);
+        print('[StravaWebViewScreen] ERROR: Failed to connect to Strava: ${token ?? "Unknown error"}');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error importing from Strava: $e')),
+          SnackBar(content: Text('Failed to connect to Strava: ${token ?? "Unknown error"}')),
         );
       }
+    } catch (e, stack) {
+      setState(() => _isLoading = false);
+      print('[StravaWebViewScreen] Error importing from Strava: $e');
+      print('[StravaWebViewScreen] Stack trace: $stack');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error importing from Strava: $e')),
+      );
     }
   }
 
@@ -129,6 +152,7 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('[StravaWebViewScreen] build called (import screen)');
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -159,7 +183,10 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
                         elevation: 8,
                         shadowColor: Colors.black26,
                       ),
-                      onPressed: _startWebOAuth,
+                      onPressed: () {
+                        print('[StravaWebViewScreen] Strava sync button pressed');
+                        _startWebOAuth();
+                      },
                       child: const Text('Connect to Strava', style: TextStyle(fontSize: 18)),
                     )
                   else
@@ -206,6 +233,21 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
                           return '${twoDigits(m)}:${twoDigits(s)}';
                         }
                       }
+                      // --- NEW: Show 'Calculating estimated time...' if import started but total is 0 ---
+                      if (runProvider.isImporting && runProvider.importTotal == 0) {
+                        return Column(
+                          children: [
+                            const SizedBox(height: 24),
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Calculating estimated time...',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        );
+                      }
+                      // --- END NEW ---
                       return Column(
                         children: [
                           const SizedBox(height: 24),

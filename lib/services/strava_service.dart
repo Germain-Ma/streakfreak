@@ -22,6 +22,7 @@ class StravaService {
   }
 
   Future<String?> exchangeCodeForToken(String code) async {
+    print('[StravaService] Exchanging code for token with code: $code');
     final response = await http.post(
       Uri.parse(tokenUrl),
       body: {
@@ -32,6 +33,8 @@ class StravaService {
         'redirect_uri': redirectUri,
       },
     );
+    print('[StravaService] Token exchange response status: ${response.statusCode}');
+    print('[StravaService] Token exchange response body: ${response.body}');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final prefs = await SharedPreferences.getInstance();
@@ -60,15 +63,20 @@ class StravaService {
 
   Future<List<Map<String, dynamic>>> fetchActivities() async {
     final accessToken = await getAccessToken();
+    print('[StravaService] Fetching activities with accessToken: $accessToken');
     if (accessToken == null) return [];
     List<Map<String, dynamic>> allActivities = [];
     int page = 1;
     const int perPage = 200;
     while (true) {
+      final url = '$activitiesUrl?per_page=$perPage&page=$page';
+      print('[StravaService] Fetching activities from: $url');
       final response = await http.get(
-        Uri.parse('$activitiesUrl?per_page=$perPage&page=$page'),
+        Uri.parse(url),
         headers: {'Authorization': 'Bearer $accessToken'},
       );
+      print('[StravaService] Activities fetch response status: ${response.statusCode}');
+      print('[StravaService] Activities fetch response body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is List && data.isNotEmpty) {
