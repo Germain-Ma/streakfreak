@@ -61,8 +61,7 @@ class StravaService {
     List<Map<String, dynamic>> allActivities = [];
     int page = 1;
     const int perPage = 200;
-    bool allKnown = false;
-    while (!allKnown) {
+    while (true) {
       final url = '$activitiesUrl?per_page=$perPage&page=$page';
       final response = await http.get(
         Uri.parse(url),
@@ -73,8 +72,8 @@ class StravaService {
         if (data is List && data.isNotEmpty) {
           final pageActivities = List<Map<String, dynamic>>.from(data);
           allActivities.addAll(pageActivities);
+          // If all activity IDs on this page are already known, stop immediately (even after first page)
           if (knownIds != null && pageActivities.every((a) => knownIds.contains((a['id'] ?? '').toString()))) {
-            allKnown = true;
             break;
           }
           if (data.length < perPage) break; // Last page
@@ -86,6 +85,10 @@ class StravaService {
         // ignore: avoid_print
         print('[StravaService] Activities fetch error: ${response.statusCode} ${response.body}');
         break; // Error, stop fetching
+      }
+      // Only fetch the first page unless new activities are found
+      if (page == 2 && (knownIds == null || allActivities.every((a) => knownIds.contains((a['id'] ?? '').toString())))) {
+        break;
       }
     }
     return allActivities;
