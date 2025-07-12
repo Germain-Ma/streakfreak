@@ -30,8 +30,29 @@ class Run {
     this.maxHeartRate,
   });
 
+  static List<String> _csvLogSamples = [];
+  static int _csvLogCount = 0;
+  static void logCsvRow(Map<String, String> row) {
+    if (_csvLogSamples.length < 10) {
+      _csvLogSamples.add(row.toString());
+    }
+    _csvLogCount++;
+  }
+  static void flushLog() {
+    if (_csvLogCount > 0) {
+      // ignore: avoid_print
+      print('[Run.fromCsv] Parsed $_csvLogCount rows. Sample rows:');
+      for (final sample in _csvLogSamples) {
+        // ignore: avoid_print
+        print(sample);
+      }
+      _csvLogSamples.clear();
+      _csvLogCount = 0;
+    }
+  }
+
   static Run? fromCsv(Map<String, String> row) {
-    // Removed all print/debug statements for performance
+    logCsvRow(row);
     try {
       final dateStr = row['Date'];
       if (dateStr == null || dateStr.isEmpty) {

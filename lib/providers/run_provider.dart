@@ -202,6 +202,9 @@ class RunProvider extends ChangeNotifier {
       }
     }
 
+    // Flush bundled Run.fromCsv logs (prints only once)
+    Run.flushLog();
+
     final allActivities = [...existingById.values, ...newActivities];
     final finalActivities = _removeDuplicates(allActivities);
 
