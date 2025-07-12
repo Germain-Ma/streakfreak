@@ -109,7 +109,7 @@ class RunProvider extends ChangeNotifier {
   }
 
   /// Import activities from Strava API
-  Future<void> importFromStrava() async {
+  Future<void> importFromStrava({DateTime? after, List<Activity>? existingActivities}) async {
     _isImporting = true;
     _importProgress = 0;
     _importTotal = 0;
@@ -123,8 +123,8 @@ class RunProvider extends ChangeNotifier {
       return;
     }
 
-    // Fetch existing activities from Supabase and local storage
-    final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
+    // Use provided existing activities (from Supabase) if available, else fetch
+    final cloudActivities = existingActivities ?? await _supabaseService.fetchActivities(_athleteId!);
     final localActivities = await _storageService.loadActivities(_athleteId!);
     final allExisting = [...cloudActivities, ...localActivities];
     final deduplicatedExisting = _removeDuplicates(allExisting);
@@ -138,14 +138,16 @@ class RunProvider extends ChangeNotifier {
     // Build set of known Strava IDs
     final Set<String> knownIds = existingById.keys.toSet();
 
-    // Find the latest activity date in the database
-    DateTime? latestDate;
-    for (final a in existingById.values) {
-      final dateStr = a.fields['Date'];
-      if (dateStr != null && dateStr.isNotEmpty) {
-        final d = DateTime.tryParse(dateStr);
-        if (d != null && (latestDate == null || d.isAfter(latestDate))) {
-          latestDate = d;
+    // Find the latest activity date in the database, or use provided 'after'
+    DateTime? latestDate = after;
+    if (latestDate == null) {
+      for (final a in existingById.values) {
+        final dateStr = a.fields['Date'];
+        if (dateStr != null && dateStr.isNotEmpty) {
+          final d = DateTime.tryParse(dateStr);
+          if (d != null && (latestDate == null || d.isAfter(latestDate))) {
+            latestDate = d;
+          }
         }
       }
     }
@@ -416,5 +418,9 @@ class RunProvider extends ChangeNotifier {
 
   Future<void> ensureAthleteId() async {
     _athleteId ??= await _stravaService.getAthleteId();
+  }
+
+  Future<List<Activity>> fetchSupabaseActivities(String athleteId) async {
+    return await _supabaseService.fetchActivities(athleteId);
   }
 } 

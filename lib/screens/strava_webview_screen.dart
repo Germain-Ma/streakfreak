@@ -100,9 +100,36 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       // Exchange code for token
       final token = await _stravaService.exchangeCodeForToken(code);
       if (token != null && !token.startsWith('Error:')) {
-        // Import activities from Strava
         final runProvider = context.read<RunProvider>();
-        await runProvider.importFromStrava();
+        // 1. Get Strava ID
+        final stravaId = await _stravaService.getAthleteId();
+        if (stravaId == null) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not determine Strava athlete ID.')),
+          );
+          return;
+        }
+        // 2. Check Supabase for activities
+        final supabaseActivities = await runProvider.fetchSupabaseActivities(stravaId);
+        if (supabaseActivities.isNotEmpty) {
+          // 3. Find latest activity date
+          DateTime? latestDate;
+          for (final a in supabaseActivities) {
+            final dateStr = a.fields['Date'];
+            if (dateStr != null && dateStr.isNotEmpty) {
+              final d = DateTime.tryParse(dateStr);
+              if (d != null && (latestDate == null || d.isAfter(latestDate))) {
+                latestDate = d;
+              }
+            }
+          }
+          // 4. Only fetch new activities from Strava
+          await runProvider.importFromStrava(after: latestDate, existingActivities: supabaseActivities);
+        } else {
+          // No activities in Supabase, do full import
+          await runProvider.importFromStrava();
+        }
         // Wait for GPS extraction
         final locationProvider = context.read<LocationProvider>();
         await locationProvider.refresh();
