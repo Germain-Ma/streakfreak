@@ -105,38 +105,7 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       if (token != null && !token.startsWith('Error:')) {
         // Import activities from Strava
         final runProvider = context.read<RunProvider>();
-        final stravaId = await runProvider.stravaService.getAthleteId();
-        print('[StravaWebViewScreen] Athlete ID: ' + (stravaId ?? 'null'));
-        if (stravaId == null) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not determine Strava athlete ID.')),
-          );
-          return;
-        }
-        print('[StravaWebViewScreen] Checking Supabase for activities...');
-        final supabaseActivities = await runProvider.fetchSupabaseActivities(stravaId);
-        print('[StravaWebViewScreen] Supabase activities count: ' + supabaseActivities.length.toString());
-        if (supabaseActivities.isNotEmpty) {
-          // Find latest activity date
-          DateTime? latestDate;
-          for (final a in supabaseActivities) {
-            final dateStr = a.fields['Date'];
-            if (dateStr != null && dateStr.isNotEmpty) {
-              final d = DateTime.tryParse(dateStr);
-              if (d != null && (latestDate == null || d.isAfter(latestDate))) {
-                latestDate = d;
-              }
-            }
-          }
-          print('[StravaWebViewScreen] Latest activity date in Supabase: ' + (latestDate?.toIso8601String() ?? 'null'));
-          print('[StravaWebViewScreen] Fetching new activities from Strava after latest date...');
-          await runProvider.importFromStrava(after: latestDate, existingActivities: supabaseActivities);
-        } else {
-          print('[StravaWebViewScreen] No activities in Supabase, doing full import from Strava.');
-          await runProvider.importFromStrava();
-        }
-        print('[StravaWebViewScreen] Import complete. Final activities in provider: ' + runProvider.activities.length.toString());
+        await runProvider.importFromStrava();
         // Wait for GPS extraction
         final locationProvider = context.read<LocationProvider>();
         await locationProvider.refresh();
@@ -149,7 +118,6 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
             gpsCount++;
           }
         }
-        print('[StravaWebViewScreen] UI update: total activities = $_total, gps = $gpsCount');
         setState(() {
           _isSuccess = true;
           _isLoading = false;
