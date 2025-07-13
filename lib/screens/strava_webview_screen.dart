@@ -114,6 +114,7 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
           );
           return;
         }
+        print('[StravaWebViewScreen] Checking Supabase for activities...');
         final supabaseActivities = await runProvider.fetchSupabaseActivities(stravaId);
         print('[StravaWebViewScreen] Supabase activities count: ' + supabaseActivities.length.toString());
         if (supabaseActivities.isNotEmpty) {
@@ -129,12 +130,13 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
             }
           }
           print('[StravaWebViewScreen] Latest activity date in Supabase: ' + (latestDate?.toIso8601String() ?? 'null'));
-          // Only fetch new activities from Strava
+          print('[StravaWebViewScreen] Fetching new activities from Strava after latest date...');
           await runProvider.importFromStrava(after: latestDate, existingActivities: supabaseActivities);
         } else {
-          print('[StravaWebViewScreen] No activities in Supabase, doing full import.');
+          print('[StravaWebViewScreen] No activities in Supabase, doing full import from Strava.');
           await runProvider.importFromStrava();
         }
+        print('[StravaWebViewScreen] Import complete. Final activities in provider: ' + runProvider.activities.length.toString());
         // Wait for GPS extraction
         final locationProvider = context.read<LocationProvider>();
         await locationProvider.refresh();
@@ -147,6 +149,7 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
             gpsCount++;
           }
         }
+        print('[StravaWebViewScreen] UI update: total activities = $_total, gps = $gpsCount');
         setState(() {
           _isSuccess = true;
           _isLoading = false;

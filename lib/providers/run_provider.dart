@@ -134,8 +134,7 @@ class RunProvider extends ChangeNotifier {
 
   /// Import activities from Strava API
   Future<void> importFromStrava({DateTime? after, List<Activity>? existingActivities}) async {
-    print('[importFromStrava] ENTERED, athleteId:  [36m$_athleteId [0m');
-    print('[importFromStrava] START');
+    print('[RunProvider] importFromStrava called. after: ' + (after?.toIso8601String() ?? 'null') + ', existingActivities: ' + (existingActivities?.length.toString() ?? 'null'));
     _isImporting = true;
     _importProgress = 0;
     _importTotal = 0;
@@ -143,9 +142,9 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
 
     await ensureAthleteId();
-    print('[importFromStrava] athleteId: $_athleteId');
+    print('[RunProvider] athleteId: $_athleteId');
     if (_athleteId == null) {
-      print('[importFromStrava] ERROR: Could not determine Strava athlete ID.');
+      print('[RunProvider] ERROR: Could not determine Strava athlete ID.');
       _importStatus = 'Could not determine Strava athlete ID.';
       notifyListeners();
       return;
@@ -153,9 +152,12 @@ class RunProvider extends ChangeNotifier {
 
     // Use provided existing activities (from Supabase) if available, else fetch
     final cloudActivities = existingActivities ?? await _supabaseService.fetchActivities(_athleteId!);
+    print('[RunProvider] cloudActivities (Supabase) count: ${cloudActivities.length}');
     final localActivities = await _storageService.loadActivities(_athleteId!);
+    print('[RunProvider] localActivities count: ${localActivities.length}');
     final allExisting = [...cloudActivities, ...localActivities];
     final deduplicatedExisting = _removeDuplicates(allExisting);
+    print('[RunProvider] deduplicatedExisting count: ${deduplicatedExisting.length}');
     final Map<String, Activity> existingById = {};
     for (final a in deduplicatedExisting) {
       if (a.id != null && a.id!.isNotEmpty) {
@@ -165,6 +167,7 @@ class RunProvider extends ChangeNotifier {
 
     // Build set of known Strava IDs
     final Set<String> knownIds = existingById.keys.toSet();
+    print('[RunProvider] knownIds count: ${knownIds.length}');
 
     // Find the latest activity date in the database, or use provided 'after'
     DateTime? latestDate = after;
@@ -179,13 +182,16 @@ class RunProvider extends ChangeNotifier {
         }
       }
     }
+    print('[RunProvider] latestDate used for Strava fetch: ' + (latestDate?.toIso8601String() ?? 'null'));
 
     // Fetch activities from Strava, only after the latest date
     final stravaActivities = await _stravaService.fetchActivities(after: latestDate);
+    print('[RunProvider] stravaActivities fetched: ${stravaActivities.length}');
     final filteredActivities = stravaActivities.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
       return type == 'run' || type == 'trailrun';
     }).toList();
+    print('[RunProvider] filteredActivities (run/trailrun): ${filteredActivities.length}');
 
     // Only import new activities (not already in existingById)
     List<Activity> newActivities = [];
@@ -231,11 +237,11 @@ class RunProvider extends ChangeNotifier {
         importErrors.add('Error importing activity at index $i: $e');
       }
     }
-
-    // Flush bundled Run.fromCsv logs (prints only once)
+    print('[RunProvider] newActivities to import: ${newActivities.length}');
 
     final allActivities = [...existingById.values, ...newActivities];
     final finalActivities = _removeDuplicates(allActivities);
+    print('[RunProvider] finalActivities after deduplication: ${finalActivities.length}');
 
     _importStatus = 'Uploading new activities to cloud...';
     notifyListeners();
@@ -262,6 +268,7 @@ class RunProvider extends ChangeNotifier {
     _importProgress = 0;
     _importTotal = 0;
     _importStatus = '';
+    print('[RunProvider] importFromStrava complete. _activities count: ${_activities.length}');
     notifyListeners();
   }
 
@@ -447,7 +454,10 @@ class RunProvider extends ChangeNotifier {
   }
 
   Future<List<Activity>> fetchSupabaseActivities(String athleteId) async {
-    return await _supabaseService.fetchActivities(athleteId);
+    print('[RunProvider] fetchSupabaseActivities called for athleteId: $athleteId');
+    final activities = await _supabaseService.fetchActivities(athleteId);
+    print('[RunProvider] Supabase returned ${activities.length} activities');
+    return activities;
   }
 
   List<Activity> _removeDuplicates(List<Activity> activities) {
