@@ -30,7 +30,12 @@ class Run {
     this.maxHeartRate,
   });
 
+  static int _csvDebugCount = 0;
   static Run? fromCsv(Map<String, String> row) {
+    if (_csvDebugCount < 5) {
+      print('[Run.fromCsv DEBUG] Moving Time: "${row['Moving Time']}" Elapsed Time: "${row['Elapsed Time']}"');
+      _csvDebugCount++;
+    }
     // print('[Run.fromCsv] called with row: $row'); // Commented out to reduce log noise
     // --- BEGIN SKIPPED RUNS DEBUG ---
     try {
