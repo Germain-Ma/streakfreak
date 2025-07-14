@@ -69,7 +69,9 @@ class InsightsScreen extends StatelessWidget {
     // Personal records
     final longestRun = runs.reduce((a, b) => a.distanceKm > b.distanceKm ? a : b);
     final highestElevation = runs.reduce((a, b) => a.elevationGain > b.elevationGain ? a : b);
-    final fastestRun = runs.where((r) => r.avgSpeed > 0).isNotEmpty ? runs.where((r) => r.avgSpeed > 0).reduce((a, b) => a.avgSpeed > b.avgSpeed ? a : b) : null;
+    final fastestRun = runs.where((r) => r.avgSpeed > 0 && r.distanceKm >= 5).isNotEmpty
+        ? runs.where((r) => r.avgSpeed > 0 && r.distanceKm >= 5).reduce((a, b) => a.avgSpeed > b.avgSpeed ? a : b)
+        : null;
     final maxCalories = runs.reduce((a, b) => a.calories > b.calories ? a : b);
 
     // Streaks
