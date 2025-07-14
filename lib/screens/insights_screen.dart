@@ -217,7 +217,11 @@ class InsightsScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _recordLink(fastestRun.title, fastestRun.stravaId),
-                          Text(" was your best Run with a average of ${(fastestRun.avgSpeed * 3.6).toStringAsFixed(2)} km/h (${_formatDuration((1000 / fastestRun.avgSpeed).round())} /km)", style: const TextStyle(color: Colors.white, fontSize: 16)),
+                          Text(" was your best Run with a average of ", style: const TextStyle(color: Colors.white, fontSize: 16)),
+                          Text(
+                            "${(fastestRun.avgSpeed * 3.6).toStringAsFixed(2)} km/h (${_formatDuration((1000 / fastestRun.avgSpeed).round())} /km)",
+                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
                     Row(
