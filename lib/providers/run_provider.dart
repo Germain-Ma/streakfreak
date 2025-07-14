@@ -39,8 +39,9 @@ class RunProvider extends ChangeNotifier {
   List<Activity> get activities => _activities;
 
   List<Run> get runs {
-    print('[RunProvider.runs] getter called, _activities.length: ${_activities.length}');
+    // print('[RunProvider.runs] getter called, _activities.length: ${_activities.length}');
     runsGetterCallCount++;
+    /*
     if (runsGetterCallCount == 1) {
       print('Total activities: ' + _activities.length.toString());
       final validRuns = _activities.map((a) {
@@ -60,6 +61,7 @@ class RunProvider extends ChangeNotifier {
     } else if (runsGetterCallCount % 10 == 0) {
       print('runs getter called $runsGetterCallCount times');
     }
+    */
     final validRuns = _activities.map((a) {
       try {
         final type = (a.fields['Activity Type'] ?? '').toLowerCase();
@@ -74,7 +76,7 @@ class RunProvider extends ChangeNotifier {
 
   // Computed stats
   int get streak {
-    print('[RunProvider.streak] getter called');
+    // print('[RunProvider.streak] getter called');
     final r = runs;
     if (r.isEmpty) return 0;
     r.sort((a, b) => b.date.compareTo(a.date));
@@ -91,14 +93,14 @@ class RunProvider extends ChangeNotifier {
   }
 
   double get totalKm {
-    print('[RunProvider.totalKm] getter called');
+    // print('[RunProvider.totalKm] getter called');
     final r = runs;
     if (r.isEmpty) return 0.0;
     return r.fold(0.0, (sum, r) => sum + r.distanceKm);
   }
 
   double get avgKmPerDay {
-    print('[RunProvider.avgKmPerDay] getter called');
+    // print('[RunProvider.avgKmPerDay] getter called');
     final r = runs;
     if (r.isEmpty) return 0.0;
     final days = r.last.date.difference(r.first.date).inDays + 1;
@@ -106,7 +108,7 @@ class RunProvider extends ChangeNotifier {
   }
 
   DateTime? get firstDay {
-    print('[RunProvider.firstDay] getter called');
+    // print('[RunProvider.firstDay] getter called');
     final r = runs;
     return r.isEmpty ? null : r.map((r) => r.date).reduce((a, b) => a.isBefore(b) ? a : b);
   }
