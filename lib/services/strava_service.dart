@@ -40,6 +40,10 @@ class StravaService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('strava_access_token', data['access_token']);
       await prefs.setString('strava_refresh_token', data['refresh_token']);
+      // Debug print for athlete ID from token response
+      if (data['athlete'] != null && data['athlete']['id'] != null) {
+        print('[StravaService] Athlete ID from token response: ${data['athlete']['id']}');
+      }
       // Fetch and store athlete ID after successful token exchange
       await fetchAndStoreAthleteId();
       return data['access_token'];
