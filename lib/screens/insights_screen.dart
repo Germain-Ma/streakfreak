@@ -101,22 +101,23 @@ class InsightsScreen extends StatelessWidget {
     List<List<dynamic>> distanceBreakdownRows;
     String? distanceBreakdownError;
     try {
+      final List<Map<String, Object>> groups = [
+        {
+          'label': '0 - 20 km',
+          'filter': (Run r) => r.distanceKm < 20,
+        },
+        {
+          'label': '20 - 40 km',
+          'filter': (Run r) => r.distanceKm >= 20 && r.distanceKm < 40,
+        },
+        {
+          'label': '40 - 60 km',
+          'filter': (Run r) => r.distanceKm >= 40 && r.distanceKm < 60,
+        },
+      ];
       distanceBreakdownRows = [
         ['Group', 'Activities', 'Distance', 'Elevation', 'Average', 'Pace', 'Moving time', 'Elapsed time'],
-        ...[
-          {
-            'label': '0 - 20 km',
-            'filter': (Run r) => r.distanceKm < 20,
-          },
-          {
-            'label': '20 - 40 km',
-            'filter': (Run r) => r.distanceKm >= 20 && r.distanceKm < 40,
-          },
-          {
-            'label': '40 - 60 km',
-            'filter': (Run r) => r.distanceKm >= 40 && r.distanceKm < 60,
-          },
-        ].map((group) {
+        ...groups.map((group) {
           final groupRuns = runs.where(group['filter'] as bool Function(Run)).toList();
           final activities = groupRuns.length;
           final distance = groupRuns.fold(0.0, (sum, r) => sum + r.distanceKm);
