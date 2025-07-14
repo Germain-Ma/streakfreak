@@ -245,9 +245,55 @@ class InsightsScreen extends StatelessWidget {
               // 9. Distance breakdown statistics
               _buildStatsTable('Distance breakdown statistics', [
                 ['Group', 'Activities', 'Distance', 'Elevation', 'Average', 'Pace', 'Moving time', 'Elapsed time'],
-                ['0 - 20 km', runs.where((r) => r.distanceKm < 20).length, '${runs.where((r) => r.distanceKm < 20).fold(0.0, (sum, r) => sum + r.distanceKm).toStringAsFixed(0)} km', '${runs.where((r) => r.distanceKm < 20).fold(0.0, (sum, r) => sum + r.elevationGain).toStringAsFixed(0)} m', '${runs.where((r) => r.distanceKm < 20).isNotEmpty ? (runs.where((r) => r.distanceKm < 20).fold(0.0, (sum, r) => sum + r.avgSpeed) / runs.where((r) => r.distanceKm < 20).length * 3.6).toStringAsFixed(2) : '-'} km/h', '-', '-', '-'],
-                ['20 - 40 km', runs.where((r) => r.distanceKm >= 20 && r.distanceKm < 40).length, '${runs.where((r) => r.distanceKm >= 20 && r.distanceKm < 40).fold(0.0, (sum, r) => sum + r.distanceKm).toStringAsFixed(0)} km', '${runs.where((r) => r.distanceKm >= 20 && r.distanceKm < 40).fold(0.0, (sum, r) => sum + r.elevationGain).toStringAsFixed(0)} m', '${runs.where((r) => r.distanceKm >= 20 && r.distanceKm < 40).isNotEmpty ? (runs.where((r) => r.distanceKm >= 20 && r.distanceKm < 40).fold(0.0, (sum, r) => sum + r.avgSpeed) / runs.where((r) => r.distanceKm >= 20 && r.distanceKm < 40).length * 3.6).toStringAsFixed(2) : '-'} km/h', '-', '-', '-'],
-                ['40 - 60 km', runs.where((r) => r.distanceKm >= 40 && r.distanceKm < 60).length, '${runs.where((r) => r.distanceKm >= 40 && r.distanceKm < 60).fold(0.0, (sum, r) => sum + r.distanceKm).toStringAsFixed(0)} km', '${runs.where((r) => r.distanceKm >= 40 && r.distanceKm < 60).fold(0.0, (sum, r) => sum + r.elevationGain).toStringAsFixed(0)} m', '${runs.where((r) => r.distanceKm >= 40 && r.distanceKm < 60).isNotEmpty ? (runs.where((r) => r.distanceKm >= 40 && r.distanceKm < 60).fold(0.0, (sum, r) => sum + r.avgSpeed) / runs.where((r) => r.distanceKm >= 40 && r.distanceKm < 60).length * 3.6).toStringAsFixed(2) : '-'} km/h', '-', '-', '-'],
+                ...[
+                  {
+                    'label': '0 - 20 km',
+                    'filter': (r) => r.distanceKm < 20,
+                  },
+                  {
+                    'label': '20 - 40 km',
+                    'filter': (r) => r.distanceKm >= 20 && r.distanceKm < 40,
+                  },
+                  {
+                    'label': '40 - 60 km',
+                    'filter': (r) => r.distanceKm >= 40 && r.distanceKm < 60,
+                  },
+                ].map((group) {
+                  final groupRuns = runs.where(group['filter'] as bool Function(dynamic)).toList();
+                  final activities = groupRuns.length;
+                  final distance = groupRuns.fold(0.0, (sum, r) => sum + r.distanceKm);
+                  final elevation = groupRuns.fold(0.0, (sum, r) => sum + r.elevationGain);
+                  final avgSpeed = activities > 0 ? (groupRuns.fold(0.0, (sum, r) => sum + r.avgSpeed) / activities * 3.6) : 0.0;
+                  final totalMovingTime = groupRuns.fold(0, (sum, r) => sum + r.movingTime);
+                  final totalElapsedTime = groupRuns.fold(0, (sum, r) => sum + r.elapsedTime);
+                  // Pace: min/km
+                  String pace;
+                  if (distance > 0 && totalMovingTime > 0) {
+                    final paceSecPerKm = totalMovingTime / distance;
+                    final paceMin = paceSecPerKm ~/ 60;
+                    final paceSec = (paceSecPerKm % 60).round();
+                    pace = '${paceMin.toString().padLeft(2, '0')}:${paceSec.toString().padLeft(2, '0')}/km';
+                  } else {
+                    pace = '-';
+                  }
+                  // Format time as hh:mm:ss
+                  String formatTime(int seconds) {
+                    final h = seconds ~/ 3600;
+                    final m = (seconds % 3600) ~/ 60;
+                    final s = seconds % 60;
+                    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+                  }
+                  return [
+                    group['label'],
+                    activities,
+                    '${distance.toStringAsFixed(0)} km',
+                    '${elevation.toStringAsFixed(0)} m',
+                    activities > 0 ? '${avgSpeed.toStringAsFixed(2)} km/h' : '-',
+                    pace,
+                    totalMovingTime > 0 ? formatTime(totalMovingTime) : '-',
+                    totalElapsedTime > 0 ? formatTime(totalElapsedTime) : '-',
+                  ];
+                }).toList(),
               ]),
               const SizedBox(height: 32),
               // 10. Country statistics
