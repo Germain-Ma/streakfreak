@@ -22,6 +22,12 @@ class InsightsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final runProvider = Provider.of<RunProvider>(context);
     final runs = runProvider.runs;
+    // DEBUG: Print number of runs and inspect first 5
+    print('[InsightsScreen DEBUG] runs.length: ${runs.length}');
+    for (int i = 0; i < (runs.length < 5 ? runs.length : 5); i++) {
+      final r = runs[i];
+      print('[InsightsScreen DEBUG] Run #$i: distanceKm=${r.distanceKm}, elevationGain=${r.elevationGain}, movingTime=${r.movingTime}, elapsedTime=${r.elapsedTime}, avgSpeed=${r.avgSpeed}');
+    }
     if (runs.isEmpty) {
       return const Center(child: Text('No run data available.'));
     }
@@ -89,6 +95,71 @@ class InsightsScreen extends StatelessWidget {
     //   countryStats[country] = (countryStats[country] ?? 0) + 1;
     // }
     // final sortedCountries = countryStats.keys.toList()..sort((a, b) => countryStats[b]!.compareTo(countryStats[a]!));
+
+    // Build distance breakdown table rows with error handling
+    List<List<dynamic>> distanceBreakdownRows;
+    String? distanceBreakdownError;
+    try {
+      distanceBreakdownRows = [
+        ['Group', 'Activities', 'Distance', 'Elevation', 'Average', 'Pace', 'Moving time', 'Elapsed time'],
+        ...[
+          {
+            'label': '0 - 20 km',
+            'filter': (r) => r.distanceKm < 20,
+          },
+          {
+            'label': '20 - 40 km',
+            'filter': (r) => r.distanceKm >= 20 && r.distanceKm < 40,
+          },
+          {
+            'label': '40 - 60 km',
+            'filter': (r) => r.distanceKm >= 40 && r.distanceKm < 60,
+          },
+        ].map((group) {
+          final groupRuns = runs.where(group['filter'] as bool Function(dynamic)).toList();
+          final activities = groupRuns.length;
+          final distance = groupRuns.fold(0.0, (sum, r) => sum + r.distanceKm);
+          final elevation = groupRuns.fold(0.0, (sum, r) => sum + r.elevationGain);
+          final avgSpeed = activities > 0 ? (groupRuns.fold(0.0, (sum, r) => sum + r.avgSpeed) / activities * 3.6) : 0.0;
+          final totalMovingTime = groupRuns.fold(0, (sum, r) => sum + r.movingTime);
+          final totalElapsedTime = groupRuns.fold(0, (sum, r) => sum + r.elapsedTime);
+          // Pace: min/km
+          String pace;
+          if (distance > 0 && totalMovingTime > 0) {
+            final paceSecPerKm = totalMovingTime / distance;
+            final paceMin = paceSecPerKm ~/ 60;
+            final paceSec = (paceSecPerKm % 60).round();
+            pace = '${paceMin.toString().padLeft(2, '0')}:${paceSec.toString().padLeft(2, '0')}/km';
+          } else {
+            pace = '-';
+          }
+          // Format time as hh:mm:ss
+          String formatTime(int seconds) {
+            final h = seconds ~/ 3600;
+            final m = (seconds % 3600) ~/ 60;
+            final s = seconds % 60;
+            return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+          }
+          return [
+            group['label'],
+            activities,
+            '${distance.toStringAsFixed(0)} km',
+            '${elevation.toStringAsFixed(0)} m',
+            activities > 0 ? '${avgSpeed.toStringAsFixed(2)} km/h' : '-',
+            pace,
+            totalMovingTime > 0 ? formatTime(totalMovingTime) : '-',
+            totalElapsedTime > 0 ? formatTime(totalElapsedTime) : '-',
+          ];
+        }).toList(),
+      ];
+    } catch (e, stack) {
+      distanceBreakdownRows = [
+        ['Group', 'Activities', 'Distance', 'Elevation', 'Average', 'Pace', 'Moving time', 'Elapsed time'],
+        ['Error', '-', '-', '-', '-', '-', '-', '-'],
+      ];
+      distanceBreakdownError = '[InsightsScreen ERROR] Distance breakdown table: $e\n$stack';
+      print(distanceBreakdownError);
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF181A20),
@@ -243,59 +314,12 @@ class InsightsScreen extends StatelessWidget {
               ]),
               const SizedBox(height: 32),
               // 9. Distance breakdown statistics
-              _buildStatsTable('Distance breakdown statistics', [
-                ['Group', 'Activities', 'Distance', 'Elevation', 'Average', 'Pace', 'Moving time', 'Elapsed time'],
-                ...[
-                  {
-                    'label': '0 - 20 km',
-                    'filter': (r) => r.distanceKm < 20,
-                  },
-                  {
-                    'label': '20 - 40 km',
-                    'filter': (r) => r.distanceKm >= 20 && r.distanceKm < 40,
-                  },
-                  {
-                    'label': '40 - 60 km',
-                    'filter': (r) => r.distanceKm >= 40 && r.distanceKm < 60,
-                  },
-                ].map((group) {
-                  final groupRuns = runs.where(group['filter'] as bool Function(dynamic)).toList();
-                  final activities = groupRuns.length;
-                  final distance = groupRuns.fold(0.0, (sum, r) => sum + r.distanceKm);
-                  final elevation = groupRuns.fold(0.0, (sum, r) => sum + r.elevationGain);
-                  final avgSpeed = activities > 0 ? (groupRuns.fold(0.0, (sum, r) => sum + r.avgSpeed) / activities * 3.6) : 0.0;
-                  final totalMovingTime = groupRuns.fold(0, (sum, r) => sum + r.movingTime);
-                  final totalElapsedTime = groupRuns.fold(0, (sum, r) => sum + r.elapsedTime);
-                  // Pace: min/km
-                  String pace;
-                  if (distance > 0 && totalMovingTime > 0) {
-                    final paceSecPerKm = totalMovingTime / distance;
-                    final paceMin = paceSecPerKm ~/ 60;
-                    final paceSec = (paceSecPerKm % 60).round();
-                    pace = '${paceMin.toString().padLeft(2, '0')}:${paceSec.toString().padLeft(2, '0')}/km';
-                  } else {
-                    pace = '-';
-                  }
-                  // Format time as hh:mm:ss
-                  String formatTime(int seconds) {
-                    final h = seconds ~/ 3600;
-                    final m = (seconds % 3600) ~/ 60;
-                    final s = seconds % 60;
-                    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-                  }
-                  return [
-                    group['label'],
-                    activities,
-                    '${distance.toStringAsFixed(0)} km',
-                    '${elevation.toStringAsFixed(0)} m',
-                    activities > 0 ? '${avgSpeed.toStringAsFixed(2)} km/h' : '-',
-                    pace,
-                    totalMovingTime > 0 ? formatTime(totalMovingTime) : '-',
-                    totalElapsedTime > 0 ? formatTime(totalElapsedTime) : '-',
-                  ];
-                }).toList(),
-              ]),
-              const SizedBox(height: 32),
+              _buildStatsTable('Distance breakdown statistics', distanceBreakdownRows),
+              if (distanceBreakdownError != null)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(distanceBreakdownError!, style: const TextStyle(color: Colors.red)),
+                ),
               // 10. Country statistics
               // _buildStatsTable('Country statistics', [
               //   ['Country', 'Activities'],
