@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/run.dart';
 
 class InsightsScreen extends StatelessWidget {
   const InsightsScreen({super.key});
@@ -105,18 +106,18 @@ class InsightsScreen extends StatelessWidget {
         ...[
           {
             'label': '0 - 20 km',
-            'filter': (dynamic r) => r.distanceKm < 20,
+            'filter': (Run r) => r.distanceKm < 20,
           },
           {
             'label': '20 - 40 km',
-            'filter': (dynamic r) => r.distanceKm >= 20 && r.distanceKm < 40,
+            'filter': (Run r) => r.distanceKm >= 20 && r.distanceKm < 40,
           },
           {
             'label': '40 - 60 km',
-            'filter': (dynamic r) => r.distanceKm >= 40 && r.distanceKm < 60,
+            'filter': (Run r) => r.distanceKm >= 40 && r.distanceKm < 60,
           },
         ].map((group) {
-          final groupRuns = runs.where(group['filter'] as bool Function(dynamic)).toList();
+          final groupRuns = runs.where(group['filter'] as bool Function(Run)).toList();
           final activities = groupRuns.length;
           final distance = groupRuns.fold(0.0, (sum, r) => sum + r.distanceKm);
           final elevation = groupRuns.fold(0.0, (sum, r) => sum + r.elevationGain);
