@@ -253,6 +253,11 @@ class RunProvider extends ChangeNotifier {
       await _storageService.saveActivities(_athleteId!, _activities);
       if (newActivities.isNotEmpty) {
         await _supabaseService.uploadActivities(_athleteId!, newActivities);
+        // After uploading, fetch all activities from Supabase to refresh the local list
+        final allCloudActivities = await _supabaseService.fetchActivities(_athleteId!);
+        _activities = allCloudActivities;
+        await _storageService.saveActivities(_athleteId!, _activities);
+        notifyListeners();
       }
     } finally {
       _isSyncingCloud = false;
