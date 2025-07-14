@@ -105,15 +105,15 @@ class InsightsScreen extends StatelessWidget {
         ...[
           {
             'label': '0 - 20 km',
-            'filter': (r) => r.distanceKm < 20,
+            'filter': (dynamic r) => r.distanceKm < 20,
           },
           {
             'label': '20 - 40 km',
-            'filter': (r) => r.distanceKm >= 20 && r.distanceKm < 40,
+            'filter': (dynamic r) => r.distanceKm >= 20 && r.distanceKm < 40,
           },
           {
             'label': '40 - 60 km',
-            'filter': (r) => r.distanceKm >= 40 && r.distanceKm < 60,
+            'filter': (dynamic r) => r.distanceKm >= 40 && r.distanceKm < 60,
           },
         ].map((group) {
           final groupRuns = runs.where(group['filter'] as bool Function(dynamic)).toList();
