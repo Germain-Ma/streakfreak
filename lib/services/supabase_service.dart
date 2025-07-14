@@ -50,18 +50,21 @@ class SupabaseService {
     List<Activity> allActivities = [];
     int batchSize = 1000;
     int from = 0;
+    int batch = 1;
     while (true) {
       final data = await client
           .from('activities')
           .select('data')
           .eq('strava_id', stravaId)
           .range(from, from + batchSize - 1);
+      print('[SupabaseService] Batch #$batch: Fetched ${data == null ? 0 : data.length} activities (from $from to ${from + batchSize - 1})');
       if (data == null || data is! List || data.isEmpty) break;
       allActivities.addAll(data.map<Activity>((row) => Activity.fromJson(row['data'])));
       if (data.length < batchSize) break; // Last batch
       from += batchSize;
+      batch++;
     }
-    print('[SupabaseService] Fetched ${allActivities.length} activities from Supabase');
+    print('[SupabaseService] Fetched total ${allActivities.length} activities from Supabase');
     return allActivities;
   }
 } 
