@@ -47,18 +47,21 @@ class SupabaseService {
 
   Future<List<Activity>> fetchActivities(String stravaId) async {
     await init();
-    try {
+    List<Activity> allActivities = [];
+    int batchSize = 1000;
+    int from = 0;
+    while (true) {
       final data = await client
           .from('activities')
           .select('data')
           .eq('strava_id', stravaId)
-          .limit(3000); // Ensure all activities are fetched
-      if (data == null || data is! List) return [];
-      print('[SupabaseService] Fetched ${data.length} activities from Supabase');
-      return data.map<Activity>((row) => Activity.fromJson(row['data'])).toList();
-    } catch (e) {
-      print('[Supabase fetch error]: $e');
-      throw Exception('Supabase fetch error: $e');
+          .range(from, from + batchSize - 1);
+      if (data == null || data is! List || data.isEmpty) break;
+      allActivities.addAll(data.map<Activity>((row) => Activity.fromJson(row['data'])));
+      if (data.length < batchSize) break; // Last batch
+      from += batchSize;
     }
+    print('[SupabaseService] Fetched ${allActivities.length} activities from Supabase');
+    return allActivities;
   }
 } 
