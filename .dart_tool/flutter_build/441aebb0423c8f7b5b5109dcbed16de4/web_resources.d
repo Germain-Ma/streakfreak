@@ -1,1 +1,0 @@
-:  /Users/germainmachleidt/Documents/Coding/streakfreak/web/index.html
