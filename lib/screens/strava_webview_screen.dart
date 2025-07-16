@@ -73,13 +73,13 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       final code = Uri.base.queryParameters['code'];
       final state = Uri.base.queryParameters['state'];
       print('[StravaWebViewScreen] initState code param: $code, state param: $state');
-      if (code == null || code.isEmpty) {
-        print('[StravaWebViewScreen] ERROR: code param is missing or empty. Uri.base:  [33m${Uri.base} [0m, query params: ${Uri.base.queryParameters}');
-        // Optionally show a user-friendly error here
-        return;
-      }
-      if (!_isSuccess) {
-        _handleStravaRedirect(html.window.location.href);
+      if (code != null && code.isNotEmpty) {
+        if (!_isSuccess) {
+          _handleStravaRedirect(html.window.location.href);
+        }
+      } else {
+        // No code parameter - this is normal on app startup, not an error
+        print('[StravaWebViewScreen] No code parameter found - normal app startup');
       }
     }
   }
