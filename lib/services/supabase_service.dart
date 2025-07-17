@@ -56,4 +56,13 @@ class SupabaseService {
       throw Exception('Supabase fetch error: $e');
     }
   }
+
+  Future<void> deleteActivity(String stravaId, String activityId) async {
+    await init();
+    try {
+      await client.from('activities').delete().eq('strava_id', stravaId).eq('activity_id', activityId);
+    } catch (e) {
+      print('[Supabase delete error]: $e');
+    }
+  }
 } 

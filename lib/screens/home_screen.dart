@@ -105,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     );
 
-                    await runProvider.importFromStrava();
+                    await runProvider.smartSyncFromStrava();
 
                     // Close the progress dialog
                     if (mounted) {

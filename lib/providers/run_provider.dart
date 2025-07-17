@@ -229,6 +229,106 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Smart sync from Strava: afterOAuth = true means only fetch new activities using 'after' param.
+  /// afterOAuth = false (manual sync) means full two-way sync (add new, delete missing).
+  Future<void> smartSyncFromStrava({bool afterOAuth = false}) async {
+    await ensureAthleteId();
+    if (_athleteId == null) {
+      _importStatus = 'Could not determine Strava athlete ID.';
+      notifyListeners();
+      return;
+    }
+    _isImporting = true;
+    _importProgress = 0;
+    _importTotal = 0;
+    _importStatus = 'Syncing with Strava...';
+    notifyListeners();
+
+    // 1. Load all activities from Supabase
+    final supabaseActivities = await _supabaseService.fetchActivities(_athleteId!);
+    final supabaseIds = supabaseActivities.map((a) => a.id).toSet();
+    DateTime? latestDate;
+    if (supabaseActivities.isNotEmpty) {
+      latestDate = supabaseActivities
+        .map((a) => DateTime.tryParse(a.fields['Date'] ?? ''))
+        .whereType<DateTime>()
+        .fold<DateTime?>(null, (prev, curr) => prev == null || curr.isAfter(prev) ? curr : prev);
+    }
+
+    List<Map<String, dynamic>> stravaRaw;
+    if (afterOAuth && latestDate != null) {
+      // 2. Only fetch new activities from Strava
+      stravaRaw = await _stravaService.fetchActivities(after: latestDate);
+    } else {
+      // 2. Fetch all activities from Strava
+      stravaRaw = await _stravaService.fetchActivities();
+    }
+    // 3. Filter to runs only
+    final filteredActivities = stravaRaw.where((a) {
+      final type = (a['type'] ?? '').toString().toLowerCase();
+      return type == 'run' || type == 'trailrun';
+    }).toList();
+
+    // 4. Map to Activity objects
+    List<Activity> newActivities = [];
+    for (final a in filteredActivities) {
+      final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
+      final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
+      final distanceMeters = (a['distance'] ?? 0).toString();
+      final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
+      final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
+      final avgHeartRate = a['average_heartrate']?.toString();
+      final maxHeartRate = a['max_heartrate']?.toString();
+      final fields = <String, String>{
+        'Activity Type': (a['type'] ?? '').toString(),
+        'Date': dateLocal,
+        'Distance': distanceKm,
+        'Title': (a['name'] ?? '').toString(),
+        'Start Latitude': startLat.toString(),
+        'Start Longitude': startLon.toString(),
+        'Strava ID': (a['id'] ?? '').toString(),
+        'Elevation Gain': (a['total_elevation_gain'] ?? '').toString(),
+        'Moving Time': (a['moving_time'] ?? '').toString(),
+        'Elapsed Time': (a['elapsed_time'] ?? '').toString(),
+        'Average Speed': (a['average_speed'] ?? '').toString(),
+        'Max Speed': (a['max_speed'] ?? '').toString(),
+        'Calories': (a['calories'] ?? '').toString(),
+        'Avg Heart Rate': avgHeartRate ?? '',
+        'Max Heart Rate': maxHeartRate ?? '',
+      };
+      newActivities.add(Activity(fields));
+    }
+
+    if (afterOAuth) {
+      // Only upload new activities
+      final newOnes = newActivities.where((a) => !supabaseIds.contains(a.id)).toList();
+      if (newOnes.isNotEmpty) {
+        await _supabaseService.uploadActivities(_athleteId!, newOnes);
+      }
+      // Merge for local use
+      _activities = [...supabaseActivities, ...newOnes];
+    } else {
+      // Manual sync: full two-way sync
+      final stravaIds = newActivities.map((a) => a.id).toSet();
+      // Upload new activities
+      final toUpload = newActivities.where((a) => !supabaseIds.contains(a.id)).toList();
+      if (toUpload.isNotEmpty) {
+        await _supabaseService.uploadActivities(_athleteId!, toUpload);
+      }
+      // Delete activities in Supabase not present in Strava
+      final toDelete = supabaseActivities.where((a) => !stravaIds.contains(a.id)).toList();
+      for (final a in toDelete) {
+        await _supabaseService.deleteActivity(_athleteId!, a.id!);
+      }
+      // Merge for local use
+      _activities = [...newActivities];
+    }
+    await _storageService.saveActivities(_athleteId!, _activities);
+    _isImporting = false;
+    _importStatus = '';
+    notifyListeners();
+  }
+
   Future<void> loadRuns() async {
     await ensureAthleteId();
     if (_athleteId == null) {

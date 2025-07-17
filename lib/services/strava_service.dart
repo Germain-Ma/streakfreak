@@ -61,15 +61,19 @@ class StravaService {
     return prefs.getString('strava_access_token');
   }
 
-  Future<List<Map<String, dynamic>>> fetchActivities() async {
+  Future<List<Map<String, dynamic>>> fetchActivities({DateTime? after}) async {
     final accessToken = await getAccessToken();
     print('[StravaService] Fetching activities with accessToken: $accessToken');
     if (accessToken == null) return [];
     List<Map<String, dynamic>> allActivities = [];
     int page = 1;
     const int perPage = 200;
+    int? afterTimestamp = after != null ? (after.millisecondsSinceEpoch ~/ 1000) : null;
     while (true) {
-      final url = '$activitiesUrl?per_page=$perPage&page=$page';
+      String url = '$activitiesUrl?per_page=$perPage&page=$page';
+      if (afterTimestamp != null) {
+        url += '&after=$afterTimestamp';
+      }
       print('[StravaService] Fetching activities from: $url');
       final response = await http.get(
         Uri.parse(url),

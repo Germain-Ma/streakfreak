@@ -103,9 +103,9 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       // Exchange code for token
       final token = await _stravaService.exchangeCodeForToken(code);
       if (token != null && !token.startsWith('Error:')) {
-        // Import activities from Strava
         final runProvider = context.read<RunProvider>();
-        await runProvider.importFromStrava();
+        // Smart sync: only fetch new activities from Strava after OAuth
+        await runProvider.smartSyncFromStrava(afterOAuth: true);
         // Wait for GPS extraction
         final locationProvider = context.read<LocationProvider>();
         await locationProvider.refresh();
@@ -126,7 +126,6 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
         });
         widget.onImportComplete(_total, _gps);
       } else {
-        // Handle error
         setState(() => _isLoading = false);
         print('[StravaWebViewScreen] ERROR: Failed to connect to Strava: ${token ?? "Unknown error"}');
         ScaffoldMessenger.of(context).showSnackBar(
