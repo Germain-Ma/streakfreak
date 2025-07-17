@@ -422,6 +422,9 @@ class RunProvider extends ChangeNotifier {
 
   // Helper: Get runs with at least 1.61 km per day (for streak logic)
   List<Run> get _qualifiedRuns {
+    print('[DEBUG] _qualifiedRuns getter called');
+    print('[DEBUG] Total runs available: ${runs.length}');
+    
     // Group by local date (year, month, day) as in the activity's local time zone
     final byDate = <DateTime, double>{};
     for (final run in runs) {
@@ -429,6 +432,8 @@ class RunProvider extends ChangeNotifier {
       final localDay = DateTime(run.date.year, run.date.month, run.date.day);
       byDate[localDay] = (byDate[localDay] ?? 0) + run.distanceKm;
     }
+    
+    print('[DEBUG] Total unique dates: ${byDate.length}');
     
     // Debug: Check for specific date 2024-11-14
     final targetDate = DateTime(2024, 11, 14);
@@ -446,6 +451,7 @@ class RunProvider extends ChangeNotifier {
     }
     
     final qualified = byDate.entries.where((e) => e.value >= 1.61).toList();
+    print('[DEBUG] Qualified runs (>= 1.61 km): ${qualified.length}');
     
     // Debug: Check if 2024-11-14 is in qualified runs
     final qualifiedTargetDate = qualified.where((e) => 
@@ -457,7 +463,7 @@ class RunProvider extends ChangeNotifier {
       print('[DEBUG] 2024-11-14 is NOT QUALIFIED (distance < 1.61 km or not found)');
     }
     
-    return qualified
+    final result = qualified
       .map<Run>((e) => Run(
         date: e.key,
         distanceKm: e.value,
@@ -474,6 +480,9 @@ class RunProvider extends ChangeNotifier {
       ))
       .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
+    
+    print('[DEBUG] Returning ${result.length} qualified runs');
+    return result;
   }
 
   // --- New Streak and Stats Logic ---
@@ -482,17 +491,27 @@ class RunProvider extends ChangeNotifier {
 
   // Current streak (consecutive days up to most recent)
   int get currentStreak {
+    print('[DEBUG] currentStreak getter called');
     final r = _sortedQualifiedRuns;
+    print('[DEBUG] Sorted qualified runs: ${r.length}');
     if (r.isEmpty) return 0;
+    
+    print('[DEBUG] Most recent date: ${r.first.date.toIso8601String().split('T')[0]}');
+    print('[DEBUG] Second most recent date: ${r.length > 1 ? r[1].date.toIso8601String().split('T')[0] : 'N/A'}');
+    
     int streak = 1;
     for (int i = 1; i < r.length; i++) {
       final diff = r[i - 1].date.difference(r[i].date).inDays;
+      print('[DEBUG] Date ${r[i-1].date.toIso8601String().split('T')[0]} vs ${r[i].date.toIso8601String().split('T')[0]}: diff = $diff days');
       if (diff == 1) {
         streak++;
+        print('[DEBUG] Streak continues: $streak days');
       } else if (diff > 1) {
+        print('[DEBUG] Streak broken at ${r[i].date.toIso8601String().split('T')[0]} (gap of $diff days)');
         break;
       }
     }
+    print('[DEBUG] Final streak: $streak days');
     return streak;
   }
 
