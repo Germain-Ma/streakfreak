@@ -429,8 +429,35 @@ class RunProvider extends ChangeNotifier {
       final localDay = DateTime(run.date.year, run.date.month, run.date.day);
       byDate[localDay] = (byDate[localDay] ?? 0) + run.distanceKm;
     }
-    return byDate.entries
-      .where((e) => e.value >= 1.61)
+    
+    // Debug: Check for specific date 2024-11-14
+    final targetDate = DateTime(2024, 11, 14);
+    if (byDate.containsKey(targetDate)) {
+      print('[DEBUG] Found 2024-11-14 with distance: ${byDate[targetDate]} km');
+    } else {
+      print('[DEBUG] 2024-11-14 NOT FOUND in byDate. Available dates around that time:');
+      final sortedDates = byDate.keys.toList()..sort();
+      final nearbyDates = sortedDates.where((date) => 
+        date.isAfter(DateTime(2024, 11, 10)) && date.isBefore(DateTime(2024, 11, 20))
+      ).toList();
+      for (final date in nearbyDates) {
+        print('[DEBUG] ${date.toIso8601String().split('T')[0]}: ${byDate[date]} km');
+      }
+    }
+    
+    final qualified = byDate.entries.where((e) => e.value >= 1.61).toList();
+    
+    // Debug: Check if 2024-11-14 is in qualified runs
+    final qualifiedTargetDate = qualified.where((e) => 
+      e.key.year == 2024 && e.key.month == 11 && e.key.day == 14
+    ).toList();
+    if (qualifiedTargetDate.isNotEmpty) {
+      print('[DEBUG] 2024-11-14 is QUALIFIED with distance: ${qualifiedTargetDate.first.value} km');
+    } else {
+      print('[DEBUG] 2024-11-14 is NOT QUALIFIED (distance < 1.61 km or not found)');
+    }
+    
+    return qualified
       .map<Run>((e) => Run(
         date: e.key,
         distanceKm: e.value,
