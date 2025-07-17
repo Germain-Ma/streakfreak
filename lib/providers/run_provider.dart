@@ -10,6 +10,8 @@ import '../services/strava_service.dart';
 // import '../services/web_geocoding_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/supabase_service.dart';
+import 'dart:convert'; // Added for jsonDecode
+import 'package:http/http.dart' as http;
 
 class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
@@ -255,28 +257,73 @@ class RunProvider extends ChangeNotifier {
         .fold<DateTime?>(null, (prev, curr) => prev == null || curr.isAfter(prev) ? curr : prev);
     }
 
-    List<Map<String, dynamic>> stravaRaw;
-    if (afterOAuth && latestDate != null) {
-      // 2. Only fetch new activities from Strava
-      stravaRaw = await _stravaService.fetchActivities(after: latestDate);
-    } else {
-      // 2. Fetch all activities from Strava
-      stravaRaw = await _stravaService.fetchActivities();
+    // 2. Fetch activities from Strava (with progress per page)
+    List<Map<String, dynamic>> stravaRaw = [];
+    int page = 1;
+    const int perPage = 200;
+    int? afterTimestamp = (afterOAuth && latestDate != null) ? (latestDate.millisecondsSinceEpoch ~/ 1000) : null;
+    bool morePages = true;
+    int totalFetched = 0;
+    while (morePages) {
+      String url = '${StravaService.activitiesUrl}?per_page=$perPage&page=$page';
+      if (afterTimestamp != null) url += '&after=$afterTimestamp';
+      _importStatus = 'Fetching page $page from Strava...';
+      notifyListeners();
+      try {
+        final accessToken = await _stravaService.getAccessToken();
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {'Authorization': 'Bearer $accessToken'},
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data is List && data.isNotEmpty) {
+            stravaRaw.addAll(List<Map<String, dynamic>>.from(data));
+            totalFetched += data.length;
+            if (data.length < perPage) {
+              morePages = false;
+            } else {
+              page++;
+            }
+          } else {
+            morePages = false;
+          }
+        } else {
+          print('[StravaService] Error fetching page $page: ${response.statusCode}');
+          morePages = false;
+        }
+      } catch (e) {
+        print('[StravaService] Exception fetching page $page: $e');
+        morePages = false;
+      }
     }
+    print('[smartSyncFromStrava] Total activities fetched from Strava: $totalFetched');
+
     // 3. Filter to runs only
     final filteredActivities = stravaRaw.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
       return type == 'run' || type == 'trailrun';
     }).toList();
+    print('[smartSyncFromStrava] Filtered to runs: ${filteredActivities.length}');
 
-    // 4. Map to Activity objects
+    // 4. Map to Activity objects with robust date parsing
     List<Activity> newActivities = [];
-    for (final a in filteredActivities) {
+    int skipped = 0;
+    for (int i = 0; i < filteredActivities.length; i++) {
+      final a = filteredActivities[i];
       final startLat = (a['start_latlng'] is List && a['start_latlng'].isNotEmpty) ? double.tryParse(a['start_latlng'][0].toString()) ?? 0.0 : 0.0;
       final startLon = (a['start_latlng'] is List && a['start_latlng'].length > 1) ? double.tryParse(a['start_latlng'][1].toString()) ?? 0.0 : 0.0;
       final distanceMeters = (a['distance'] ?? 0).toString();
       final distanceKm = double.tryParse(distanceMeters) != null ? (double.parse(distanceMeters) / 1000).toString() : '0.0';
       final dateLocal = (a['start_date_local'] ?? a['start_date'] ?? '').toString();
+      DateTime? parsedDate;
+      try {
+        parsedDate = DateTime.parse(dateLocal);
+      } catch (e) {
+        print('[smartSyncFromStrava] Skipped activity (invalid date: "$dateLocal"): id=${a['id']}, error: $e');
+        skipped++;
+        continue;
+      }
       final avgHeartRate = a['average_heartrate']?.toString();
       final maxHeartRate = a['max_heartrate']?.toString();
       final fields = <String, String>{
@@ -297,36 +344,47 @@ class RunProvider extends ChangeNotifier {
         'Max Heart Rate': maxHeartRate ?? '',
       };
       newActivities.add(Activity(fields));
+      _importProgress = i + 1;
+      _importTotal = filteredActivities.length;
+      if ((i + 1) % 100 == 0) print('[smartSyncFromStrava] Processed $i/${filteredActivities.length} activities');
+      if ((i + 1) % 20 == 0) {
+        _importStatus = 'Processing ${i + 1}/${filteredActivities.length} activities...';
+        notifyListeners();
+      }
     }
+    print('[smartSyncFromStrava] Skipped $skipped activities due to invalid dates.');
 
     if (afterOAuth) {
-      // Only upload new activities
       final newOnes = newActivities.where((a) => !supabaseIds.contains(a.id)).toList();
       if (newOnes.isNotEmpty) {
+        _importStatus = 'Uploading ${newOnes.length} new activities to Supabase...';
+        notifyListeners();
         await _supabaseService.uploadActivities(_athleteId!, newOnes);
       }
-      // Merge for local use
       _activities = [...supabaseActivities, ...newOnes];
     } else {
-      // Manual sync: full two-way sync
       final stravaIds = newActivities.map((a) => a.id).toSet();
-      // Upload new activities
       final toUpload = newActivities.where((a) => !supabaseIds.contains(a.id)).toList();
       if (toUpload.isNotEmpty) {
+        _importStatus = 'Uploading ${toUpload.length} new activities to Supabase...';
+        notifyListeners();
         await _supabaseService.uploadActivities(_athleteId!, toUpload);
       }
-      // Delete activities in Supabase not present in Strava
       final toDelete = supabaseActivities.where((a) => !stravaIds.contains(a.id)).toList();
-      for (final a in toDelete) {
-        await _supabaseService.deleteActivity(_athleteId!, a.id!);
+      if (toDelete.isNotEmpty) {
+        _importStatus = 'Deleting ${toDelete.length} activities from Supabase...';
+        notifyListeners();
+        for (final a in toDelete) {
+          await _supabaseService.deleteActivity(_athleteId!, a.id!);
+        }
       }
-      // Merge for local use
       _activities = [...newActivities];
     }
     await _storageService.saveActivities(_athleteId!, _activities);
     _isImporting = false;
     _importStatus = '';
     notifyListeners();
+    print('[smartSyncFromStrava] Done. Fetched: $totalFetched, Filtered: ${filteredActivities.length}, Uploaded: ${newActivities.length - skipped}, Deleted: ${afterOAuth ? 0 : (supabaseActivities.length - _activities.length)}, Skipped: $skipped');
   }
 
   Future<void> loadRuns() async {
