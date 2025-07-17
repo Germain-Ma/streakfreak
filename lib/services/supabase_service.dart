@@ -48,9 +48,26 @@ class SupabaseService {
   Future<List<Activity>> fetchActivities(String stravaId) async {
     await init();
     try {
-      final data = await client.from('activities').select('data').eq('strava_id', stravaId);
-      if (data == null || data is! List) return [];
-      return data.map<Activity>((row) => Activity.fromJson(row['data'])).toList();
+      print('[SupabaseService] Fetching activities for stravaId: $stravaId');
+      
+      // Fetch all activities with a high limit to ensure we get everything
+      final data = await client
+          .from('activities')
+          .select('data')
+          .eq('strava_id', stravaId)
+          .limit(10000); // Increased limit to get all activities
+      
+      if (data == null || data is! List) {
+        print('[SupabaseService] No data returned or invalid format');
+        return [];
+      }
+      
+      print('[SupabaseService] Fetched ${data.length} activities from Supabase');
+      
+      final activities = data.map<Activity>((row) => Activity.fromJson(row['data'])).toList();
+      print('[SupabaseService] Parsed ${activities.length} activities');
+      
+      return activities;
     } catch (e) {
       print('[Supabase fetch error]: $e');
       throw Exception('Supabase fetch error: $e');

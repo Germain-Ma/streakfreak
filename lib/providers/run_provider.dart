@@ -388,23 +388,33 @@ class RunProvider extends ChangeNotifier {
   }
 
   Future<void> loadRuns() async {
+    print('[RunProvider] loadRuns called');
     await ensureAthleteId();
     if (_athleteId == null) {
+      print('[RunProvider] No athlete ID, clearing activities');
       _activities = [];
       notifyListeners();
       return;
     }
+    print('[RunProvider] Loading runs for athlete: $_athleteId');
     _isSyncingCloud = true;
     notifyListeners();
     try {
       // Fetch from Supabase
+      print('[RunProvider] Fetching activities from Supabase...');
       final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
+      print('[RunProvider] Received ${cloudActivities.length} activities from Supabase');
+      
       // Optionally merge with local
       _activities = cloudActivities;
+      print('[RunProvider] Set _activities to ${_activities.length} activities');
+      
       await _storageService.saveActivities(_athleteId!, _activities);
+      print('[RunProvider] Saved activities to local storage');
     } finally {
       _isSyncingCloud = false;
       notifyListeners();
+      print('[RunProvider] loadRuns completed');
     }
   }
 
