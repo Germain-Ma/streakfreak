@@ -50,21 +50,40 @@ class SupabaseService {
     try {
       print('[SupabaseService] Fetching activities for stravaId: $stravaId');
       
-      // Fetch all activities with a high limit to ensure we get everything
-      final data = await client
-          .from('activities')
-          .select('data')
-          .eq('strava_id', stravaId)
-          .limit(10000); // Increased limit to get all activities
+      List<dynamic> allData = [];
+      int page = 0;
+      const int pageSize = 1000;
+      bool hasMore = true;
       
-      if (data == null || data is! List) {
-        print('[SupabaseService] No data returned or invalid format');
-        return [];
+      while (hasMore) {
+        print('[SupabaseService] Fetching page $page (${pageSize} records)...');
+        
+        final data = await client
+            .from('activities')
+            .select('data')
+            .eq('strava_id', stravaId)
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (data == null || data is! List) {
+          print('[SupabaseService] No data returned for page $page');
+          break;
+        }
+        
+        print('[SupabaseService] Page $page: fetched ${data.length} activities');
+        allData.addAll(data);
+        
+        // If we got less than pageSize, we've reached the end
+        if (data.length < pageSize) {
+          hasMore = false;
+          print('[SupabaseService] Reached end of data (got ${data.length} < $pageSize)');
+        }
+        
+        page++;
       }
       
-      print('[SupabaseService] Fetched ${data.length} activities from Supabase');
+      print('[SupabaseService] Total fetched: ${allData.length} activities from Supabase');
       
-      final activities = data.map<Activity>((row) => Activity.fromJson(row['data'])).toList();
+      final activities = allData.map<Activity>((row) => Activity.fromJson(row['data'])).toList();
       print('[SupabaseService] Parsed ${activities.length} activities');
       
       return activities;

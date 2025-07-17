@@ -409,6 +409,28 @@ class RunProvider extends ChangeNotifier {
       _activities = cloudActivities;
       print('[RunProvider] Set _activities to ${_activities.length} activities');
       
+      // Debug: Check for 2024-11-14 specifically
+      final targetDate = DateTime(2024, 11, 14);
+      final activitiesOnTargetDate = _activities.where((activity) {
+        try {
+          final activityDate = DateTime.parse(activity.fields['Date'] ?? '');
+          return activityDate.year == targetDate.year && 
+                 activityDate.month == targetDate.month && 
+                 activityDate.day == targetDate.day;
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+      
+      if (activitiesOnTargetDate.isNotEmpty) {
+        print('[RunProvider] FOUND 2024-11-14 activities: ${activitiesOnTargetDate.length}');
+        for (final activity in activitiesOnTargetDate) {
+          print('[RunProvider] 2024-11-14 activity: ${activity.fields['Title']} - ${activity.fields['Distance']} km');
+        }
+      } else {
+        print('[RunProvider] NO 2024-11-14 activities found in ${_activities.length} total activities');
+      }
+      
       await _storageService.saveActivities(_athleteId!, _activities);
       print('[RunProvider] Saved activities to local storage');
     } finally {
