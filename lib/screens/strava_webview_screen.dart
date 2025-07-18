@@ -146,14 +146,13 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       // Exchange code for token
       final token = await _stravaService.exchangeCodeForToken(code);
       if (token != null && !token.startsWith('Error:')) {
-        print('[StravaWebViewScreen] Token exchange successful, about to call smartSyncFromStrava');
+        print('[StravaWebViewScreen] Token exchange successful, about to call loadRuns and smartSyncFromStrava');
         try {
-          print('[StravaWebViewScreen] About to read RunProvider from context');
           final runProvider = context.read<RunProvider>();
           print('[StravaWebViewScreen] RunProvider read successfully: $runProvider');
-          // Smart sync: only fetch new activities from Strava after OAuth
-          print('[StravaWebViewScreen] Calling runProvider.smartSyncFromStrava(afterOAuth: true)');
-          await runProvider.smartSyncFromStrava(afterOAuth: true);
+          await runProvider.loadRuns(); // Always fetch from Supabase first
+          print('[StravaWebViewScreen] loadRuns completed');
+          await runProvider.smartSyncFromStrava(afterOAuth: true); // Then sync with Strava
           print('[StravaWebViewScreen] smartSyncFromStrava completed');
           // Wait for GPS extraction
           final locationProvider = context.read<LocationProvider>();
@@ -181,7 +180,7 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
           });
           widget.onImportComplete(_total, _gps);
         } catch (e, stack) {
-          print('[StravaWebViewScreen] ERROR in smartSyncFromStrava call: $e');
+          print('[StravaWebViewScreen] ERROR in loadRuns or smartSyncFromStrava call: $e');
           print('[StravaWebViewScreen] Stack trace: $stack');
           throw e; // Re-throw to be caught by outer try-catch
         }

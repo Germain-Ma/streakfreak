@@ -416,13 +416,8 @@ class RunProvider extends ChangeNotifier {
     _isSyncingCloud = true;
     notifyListeners();
     try {
-      // Fetch from Supabase
-      print('[RunProvider] ABOUT TO CALL _supabaseService.fetchActivities($_athleteId)');
-      print('[RunProvider] _supabaseService instance: $_supabaseService');
       final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
-      print('[RunProvider] Received ${cloudActivities.length} activities from Supabase');
-      
-      // Optionally merge with local
+      print('[RunProvider] Supabase returned ${cloudActivities.length} activities for athleteId: $_athleteId');
       _activities = cloudActivities;
       print('[RunProvider] Set _activities to ${_activities.length} activities');
       
