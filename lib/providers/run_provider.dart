@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/supabase_service.dart';
 import 'dart:convert'; // Added for jsonDecode
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart'; // Added for SharedPreferences
 
 class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
@@ -406,12 +407,21 @@ class RunProvider extends ChangeNotifier {
   Future<void> loadRuns() async {
     print('[RunProvider] >>>>> loadRuns CALLED, current _athleteId: $_athleteId <<<<<');
     await ensureAthleteId();
+    
+    // If no athlete ID from Strava, try to load from local storage or use a default
     if (_athleteId == null) {
-      print('[RunProvider] No athlete ID, clearing activities');
-      _activities = [];
-      notifyListeners();
-      return;
+      print('[RunProvider] No athlete ID from Strava, trying to load from local storage...');
+      final prefs = await SharedPreferences.getInstance();
+      _athleteId = prefs.getString('strava_athlete_id');
+      
+      if (_athleteId == null) {
+        print('[RunProvider] No athlete ID found anywhere, cannot load activities');
+        _activities = [];
+        notifyListeners();
+        return;
+      }
     }
+    
     print('[RunProvider] Loading runs for athlete: $_athleteId');
     _isSyncingCloud = true;
     notifyListeners();
@@ -448,6 +458,7 @@ class RunProvider extends ChangeNotifier {
     } catch (e, stackTrace) {
       print('[RunProvider] ERROR in loadRuns: $e');
       print('[RunProvider] Stack trace: $stackTrace');
+      // Don't clear activities on error, keep what we have
     } finally {
       _isSyncingCloud = false;
       notifyListeners();
