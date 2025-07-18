@@ -146,9 +146,12 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       // Exchange code for token
       final token = await _stravaService.exchangeCodeForToken(code);
       if (token != null && !token.startsWith('Error:')) {
+        print('[StravaWebViewScreen] Token exchange successful, about to call smartSyncFromStrava');
         final runProvider = context.read<RunProvider>();
         // Smart sync: only fetch new activities from Strava after OAuth
+        print('[StravaWebViewScreen] Calling runProvider.smartSyncFromStrava(afterOAuth: true)');
         await runProvider.smartSyncFromStrava(afterOAuth: true);
+        print('[StravaWebViewScreen] smartSyncFromStrava completed');
         // Wait for GPS extraction
         final locationProvider = context.read<LocationProvider>();
         await locationProvider.refresh();

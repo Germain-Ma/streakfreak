@@ -234,6 +234,7 @@ class RunProvider extends ChangeNotifier {
   /// Smart sync from Strava: afterOAuth = true means only fetch new activities using 'after' param.
   /// afterOAuth = false (manual sync) means full two-way sync (add new, delete missing).
   Future<void> smartSyncFromStrava({bool afterOAuth = false}) async {
+    print('[smartSyncFromStrava] METHOD ENTERED with afterOAuth: $afterOAuth');
     await ensureAthleteId();
     if (_athleteId == null) {
       _importStatus = 'Could not determine Strava athlete ID.';

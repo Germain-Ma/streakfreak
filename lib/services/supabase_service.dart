@@ -7,9 +7,19 @@ class SupabaseService {
   static bool _initialized = false;
 
   static Future<void> init() async {
+    print('[SupabaseService] init() called, _initialized: $_initialized');
     if (!_initialized) {
-      await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-      _initialized = true;
+      print('[SupabaseService] Initializing Supabase with url: $supabaseUrl');
+      try {
+        await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+        _initialized = true;
+        print('[SupabaseService] Supabase initialization successful');
+      } catch (e) {
+        print('[SupabaseService] ERROR initializing Supabase: $e');
+        throw e;
+      }
+    } else {
+      print('[SupabaseService] Supabase already initialized');
     }
   }
 
