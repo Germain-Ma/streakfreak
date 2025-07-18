@@ -56,7 +56,12 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider(create: (_) {
           print('[main.dart] Creating RunProvider');
-          return RunProvider()..loadRuns();
+          final provider = RunProvider();
+          // Load runs asynchronously after provider is created
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            provider.loadRuns();
+          });
+          return provider;
         }),
         ChangeNotifierProxyProvider<RunProvider, LocationProvider>(
           create: (_) {

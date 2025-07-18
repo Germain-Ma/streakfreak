@@ -78,9 +78,45 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
           _handleStravaRedirect(html.window.location.href);
         }
       } else {
-        // No code parameter - this is normal on app startup, not an error
-        print('[StravaWebViewScreen] No code parameter found - normal app startup');
+        // No code parameter - check if we have a stored token
+        print('[StravaWebViewScreen] No code parameter found - checking for stored token');
+        _checkForStoredToken();
       }
+    }
+  }
+
+  Future<void> _checkForStoredToken() async {
+    try {
+      final token = await _stravaService.getAccessToken();
+      if (token != null && token.isNotEmpty && !token.startsWith('Error:')) {
+        print('[StravaWebViewScreen] Found stored token, loading existing data');
+        final runProvider = context.read<RunProvider>();
+        await runProvider.loadRuns(); // This should load from Supabase
+        final locationProvider = context.read<LocationProvider>();
+        await locationProvider.refresh();
+        
+        // Count total and GPS activities
+        final activities = runProvider.activities;
+        final runs = runProvider.runs;
+        int gpsCount = 0;
+        for (final run in runs) {
+          if (run.lat != 0.0 || run.lon != 0.0) {
+            gpsCount++;
+          }
+        }
+        
+        setState(() {
+          _isSuccess = true;
+          _isLoading = false;
+          _total = activities.length;
+          _gps = gpsCount;
+        });
+        widget.onImportComplete(_total, gpsCount);
+      } else {
+        print('[StravaWebViewScreen] No stored token found, showing connect button');
+      }
+    } catch (e) {
+      print('[StravaWebViewScreen] Error checking for stored token: $e');
     }
   }
 
