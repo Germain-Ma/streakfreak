@@ -247,14 +247,20 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
 
     // 1. Load all activities from Supabase
+    print('[smartSyncFromStrava] Step 1: Loading activities from Supabase for athlete $_athleteId');
     final supabaseActivities = await _supabaseService.fetchActivities(_athleteId!);
+    print('[smartSyncFromStrava] Step 1: Received ${supabaseActivities.length} activities from Supabase');
     final supabaseIds = supabaseActivities.map((a) => a.id).toSet();
+    print('[smartSyncFromStrava] Step 1: Supabase IDs count: ${supabaseIds.length}');
     DateTime? latestDate;
     if (supabaseActivities.isNotEmpty) {
       latestDate = supabaseActivities
         .map((a) => DateTime.tryParse(a.fields['Date'] ?? ''))
         .whereType<DateTime>()
         .fold<DateTime?>(null, (prev, curr) => prev == null || curr.isAfter(prev) ? curr : prev);
+      print('[smartSyncFromStrava] Step 1: Latest date from Supabase: $latestDate');
+    } else {
+      print('[smartSyncFromStrava] Step 1: No activities found in Supabase');
     }
 
     // 2. Fetch activities from Strava (with progress per page)

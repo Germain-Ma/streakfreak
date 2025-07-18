@@ -61,27 +61,32 @@ class SupabaseService {
       while (hasMore) {
         print('[SupabaseService] Fetching page $page (${pageSize} records)...');
         
-        final data = await client
-            .from('activities')
-            .select('data')
-            .eq('strava_id', stravaId)
-            .range(page * pageSize, (page + 1) * pageSize - 1);
-        
-        if (data == null || data is! List) {
-          print('[SupabaseService] No data returned for page $page');
+        try {
+          final data = await client
+              .from('activities')
+              .select('data')
+              .eq('strava_id', stravaId)
+              .range(page * pageSize, (page + 1) * pageSize - 1);
+          
+          if (data == null || data is! List) {
+            print('[SupabaseService] No data returned for page $page');
+            break;
+          }
+          
+          print('[SupabaseService] Page $page: fetched ${data.length} activities');
+          allData.addAll(data);
+          
+          // If we got less than pageSize, we've reached the end
+          if (data.length < pageSize) {
+            hasMore = false;
+            print('[SupabaseService] Reached end of data (got ${data.length} < $pageSize)');
+          }
+          
+          page++;
+        } catch (pageError) {
+          print('[SupabaseService] Error fetching page $page: $pageError');
           break;
         }
-        
-        print('[SupabaseService] Page $page: fetched ${data.length} activities');
-        allData.addAll(data);
-        
-        // If we got less than pageSize, we've reached the end
-        if (data.length < pageSize) {
-          hasMore = false;
-          print('[SupabaseService] Reached end of data (got ${data.length} < $pageSize)');
-        }
-        
-        page++;
       }
       
       print('[SupabaseService] Total fetched: ${allData.length} activities from Supabase');
@@ -92,6 +97,7 @@ class SupabaseService {
       return activities;
     } catch (e) {
       print('[Supabase fetch error]: $e');
+      print('[SupabaseService] Full error details: $e');
       throw Exception('Supabase fetch error: $e');
     }
   }
