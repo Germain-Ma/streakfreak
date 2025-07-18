@@ -404,7 +404,7 @@ class RunProvider extends ChangeNotifier {
   }
 
   Future<void> loadRuns() async {
-    print('[RunProvider] loadRuns called');
+    print('[RunProvider] >>>>> loadRuns CALLED, current _athleteId: $_athleteId <<<<<');
     await ensureAthleteId();
     if (_athleteId == null) {
       print('[RunProvider] No athlete ID, clearing activities');

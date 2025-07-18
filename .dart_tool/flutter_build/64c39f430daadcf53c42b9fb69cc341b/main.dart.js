@@ -78442,7 +78442,7 @@ case 2:return A.F(o.at(-1),r)}})
 return A.H($async$h9,r)},
 l3(){var s=0,r=A.I(t.H),q,p=2,o=[],n=[],m=this,l,k,j,i,h,g,f,e,d,c,b,a
 var $async$l3=A.E(function(a0,a1){if(a0===1){o.push(a1)
-s=p}while(true)switch(s){case 0:A.a2("[RunProvider] loadRuns called")
+s=p}while(true)switch(s){case 0:A.a2("[RunProvider] >>>>> loadRuns CALLED, current _athleteId: "+A.i(m.y)+" <<<<<")
 s=3
 return A.v(m.rD(),$async$l3)
 case 3:f=m.y
@@ -79592,7 +79592,8 @@ return A.H($async$pn,r)},
 ow(a){return this.acI(a)},
 acI(a1){var s=0,r=A.I(t.pv),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0
 var $async$ow=A.E(function(a2,a3){if(a2===1){o.push(a3)
-s=p}while(true)switch(s){case 0:s=3
+s=p}while(true)switch(s){case 0:A.a2("[SupabaseService] >>>>> fetchActivities CALLED for stravaId: "+a1+" <<<<<")
+s=3
 return A.v(A.Bz(),$async$ow)
 case 3:p=5
 A.a2("[SupabaseService] Fetching activities for stravaId: "+a1)

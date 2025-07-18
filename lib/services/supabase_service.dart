@@ -56,6 +56,7 @@ class SupabaseService {
   }
 
   Future<List<Activity>> fetchActivities(String stravaId) async {
+    print('[SupabaseService] >>>>> fetchActivities CALLED for stravaId: $stravaId <<<<<');
     await init();
     try {
       print('[SupabaseService] Fetching activities for stravaId: $stravaId');
