@@ -4,6 +4,7 @@ import 'map_screen.dart';
 import 'insights_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/run_provider.dart';
+import 'strava_webview_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -48,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // Minimal test widget for Supabase fetch
+          // Supabase activities count
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
@@ -56,6 +57,22 @@ class _HomeScreenState extends State<HomeScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
             ),
           ),
+          // Connect Strava button if no activities
+          if (runProvider.activities.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const StravaWebViewScreen(),
+                    ),
+                  );
+                },
+                child: const Text('Connect Strava to Load Your Activities'),
+              ),
+            ),
           Expanded(child: _tabs[_selectedIndex]),
         ],
       ),
