@@ -147,30 +147,44 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       final token = await _stravaService.exchangeCodeForToken(code);
       if (token != null && !token.startsWith('Error:')) {
         print('[StravaWebViewScreen] Token exchange successful, about to call smartSyncFromStrava');
-        final runProvider = context.read<RunProvider>();
-        // Smart sync: only fetch new activities from Strava after OAuth
-        print('[StravaWebViewScreen] Calling runProvider.smartSyncFromStrava(afterOAuth: true)');
-        await runProvider.smartSyncFromStrava(afterOAuth: true);
-        print('[StravaWebViewScreen] smartSyncFromStrava completed');
-        // Wait for GPS extraction
-        final locationProvider = context.read<LocationProvider>();
-        await locationProvider.refresh();
-        // Count total and GPS activities
-        final activities = runProvider.activities;
-        final runs = runProvider.runs;
-        int gpsCount = 0;
-        for (final run in runs) {
-          if (run.lat != 0.0 || run.lon != 0.0) {
-            gpsCount++;
+        try {
+          print('[StravaWebViewScreen] About to read RunProvider from context');
+          final runProvider = context.read<RunProvider>();
+          print('[StravaWebViewScreen] RunProvider read successfully: $runProvider');
+          // Smart sync: only fetch new activities from Strava after OAuth
+          print('[StravaWebViewScreen] Calling runProvider.smartSyncFromStrava(afterOAuth: true)');
+          await runProvider.smartSyncFromStrava(afterOAuth: true);
+          print('[StravaWebViewScreen] smartSyncFromStrava completed');
+          // Wait for GPS extraction
+          final locationProvider = context.read<LocationProvider>();
+          await locationProvider.refresh();
+          // Count total and GPS activities
+          int gpsCount = 0;
+          int total = 0;
+          try {
+            final activities = runProvider.activities;
+            final runs = runProvider.runs;
+            total = activities.length;
+            for (final run in runs) {
+              if (run.lat != 0.0 || run.lon != 0.0) {
+                gpsCount++;
+              }
+            }
+          } catch (e) {
+            print('[StravaWebViewScreen] ERROR accessing activities/runs: $e');
           }
+          setState(() {
+            _isSuccess = true;
+            _isLoading = false;
+            _total = total;
+            _gps = gpsCount;
+          });
+          widget.onImportComplete(_total, _gps);
+        } catch (e, stack) {
+          print('[StravaWebViewScreen] ERROR in smartSyncFromStrava call: $e');
+          print('[StravaWebViewScreen] Stack trace: $stack');
+          throw e; // Re-throw to be caught by outer try-catch
         }
-        setState(() {
-          _isSuccess = true;
-          _isLoading = false;
-          _total = activities.length;
-          _gps = gpsCount;
-        });
-        widget.onImportComplete(_total, _gps);
       } else {
         setState(() => _isLoading = false);
         print('[StravaWebViewScreen] ERROR: Failed to connect to Strava: ${token ?? "Unknown error"}');
