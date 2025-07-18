@@ -248,8 +248,17 @@ class RunProvider extends ChangeNotifier {
 
     // 1. Load all activities from Supabase
     print('[smartSyncFromStrava] Step 1: Loading activities from Supabase for athlete $_athleteId');
-    final supabaseActivities = await _supabaseService.fetchActivities(_athleteId!);
-    print('[smartSyncFromStrava] Step 1: Received ${supabaseActivities.length} activities from Supabase');
+    List<Activity> supabaseActivities = [];
+    try {
+      print('[smartSyncFromStrava] Step 1: About to call _supabaseService.fetchActivities($_athleteId)');
+      supabaseActivities = await _supabaseService.fetchActivities(_athleteId!);
+      print('[smartSyncFromStrava] Step 1: Received ${supabaseActivities.length} activities from Supabase');
+    } catch (e, stackTrace) {
+      print('[smartSyncFromStrava] Step 1: ERROR fetching from Supabase: $e');
+      print('[smartSyncFromStrava] Step 1: Stack trace: $stackTrace');
+      print('[smartSyncFromStrava] Step 1: Continuing with empty Supabase activities list');
+      supabaseActivities = [];
+    }
     final supabaseIds = supabaseActivities.map((a) => a.id).toSet();
     print('[smartSyncFromStrava] Step 1: Supabase IDs count: ${supabaseIds.length}');
     DateTime? latestDate;
@@ -662,5 +671,8 @@ class RunProvider extends ChangeNotifier {
       print('[RunProvider] Using existing athlete ID: $_athleteId');
     }
     print('[RunProvider] ensureAthleteId completed with athleteId: $_athleteId');
+    if (_athleteId == null) {
+      print('[RunProvider] WARNING: athleteId is still null after ensureAthleteId!');
+    }
   }
 } 
