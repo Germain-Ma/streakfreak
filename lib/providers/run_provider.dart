@@ -407,7 +407,8 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
     try {
       // Fetch from Supabase
-      print('[RunProvider] Fetching activities from Supabase...');
+      print('[RunProvider] ABOUT TO CALL _supabaseService.fetchActivities($_athleteId)');
+      print('[RunProvider] _supabaseService instance: $_supabaseService');
       final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
       print('[RunProvider] Received ${cloudActivities.length} activities from Supabase');
       
@@ -660,5 +661,6 @@ class RunProvider extends ChangeNotifier {
     } else {
       print('[RunProvider] Using existing athlete ID: $_athleteId');
     }
+    print('[RunProvider] ensureAthleteId completed with athleteId: $_athleteId');
   }
 } 
