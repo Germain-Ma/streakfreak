@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/run_provider.dart';
-import 'providers/location_provider.dart';
 import 'screens/home_screen.dart';
-import 'screens/map_screen.dart';
-import 'screens/strava_webview_screen.dart';
 
 void main() async {
-  print('DEBUG: main() started');
+  print('DEBUG: main() started - CACHE BUST: ${DateTime.now().millisecondsSinceEpoch}');
   print('[main.dart] TOP OF FILE');
   print('[main.dart] App started at:  [32m${Uri.base.toString()} [0m');
   print('[main.dart] Uri.base: ${Uri.base}');
@@ -29,9 +26,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('[main.dart] Building MyApp with MultiProvider');
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => RunProvider()),
+        ChangeNotifierProvider(create: (_) {
+          print('[main.dart] Creating RunProvider');
+          return RunProvider();
+        }),
       ],
       child: MaterialApp(
         title: 'StreakFreak',
