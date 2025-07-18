@@ -29,9 +29,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'StreakFreak',
-      home: HomeScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => RunProvider()),
+      ],
+      child: MaterialApp(
+        title: 'StreakFreak',
+        home: HomeScreen(),
+      ),
     );
   }
 }
