@@ -86,12 +86,18 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
   }
 
   Future<void> _checkForStoredToken() async {
+    print('[StravaWebViewScreen] _checkForStoredToken called');
     try {
+      print('[StravaWebViewScreen] About to call _stravaService.getAccessToken()');
       final token = await _stravaService.getAccessToken();
+      print('[StravaWebViewScreen] getAccessToken returned: ${token != null ? (token.length > 10 ? "${token.substring(0, 10)}..." : token) : "null"}');
+      
       if (token != null && token.isNotEmpty && !token.startsWith('Error:')) {
         print('[StravaWebViewScreen] Found stored token, loading existing data');
         final runProvider = context.read<RunProvider>();
+        print('[StravaWebViewScreen] About to call runProvider.loadRuns()');
         await runProvider.loadRuns(); // This should load from Supabase
+        print('[StravaWebViewScreen] runProvider.loadRuns() completed');
         final locationProvider = context.read<LocationProvider>();
         await locationProvider.refresh();
         
@@ -114,6 +120,7 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
         widget.onImportComplete(_total, gpsCount);
       } else {
         print('[StravaWebViewScreen] No stored token found, showing connect button');
+        print('[StravaWebViewScreen] Token details: null=${token == null}, empty=${token?.isEmpty}, startsWithError=${token?.startsWith('Error:')}');
       }
     } catch (e) {
       print('[StravaWebViewScreen] Error checking for stored token: $e');

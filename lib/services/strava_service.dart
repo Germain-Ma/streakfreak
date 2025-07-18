@@ -57,8 +57,11 @@ class StravaService {
   }
 
   Future<String?> getAccessToken() async {
+    print('[StravaService] getAccessToken called');
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('strava_access_token');
+    final token = prefs.getString('strava_access_token');
+    print('[StravaService] getAccessToken returned: ${token != null ? (token.length > 10 ? "${token.substring(0, 10)}..." : token) : "null"}');
+    return token;
   }
 
   Future<List<Map<String, dynamic>>> fetchActivities({DateTime? after}) async {
