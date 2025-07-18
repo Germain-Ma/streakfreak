@@ -40,6 +40,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _onImportComplete(int total, int gps) {
+    print('[HomeScreen] Import completed: $total activities, $gps with GPS');
+    // Refresh the UI after import
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final runProvider = Provider.of<RunProvider>(context);
@@ -66,7 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const StravaWebViewScreen(),
+                      builder: (context) => StravaWebViewScreen(
+                        onImportComplete: _onImportComplete,
+                      ),
                     ),
                   );
                 },
