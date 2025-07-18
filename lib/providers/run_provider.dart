@@ -433,6 +433,9 @@ class RunProvider extends ChangeNotifier {
       
       await _storageService.saveActivities(_athleteId!, _activities);
       print('[RunProvider] Saved activities to local storage');
+    } catch (e, stackTrace) {
+      print('[RunProvider] ERROR in loadRuns: $e');
+      print('[RunProvider] Stack trace: $stackTrace');
     } finally {
       _isSyncingCloud = false;
       notifyListeners();
@@ -643,6 +646,13 @@ class RunProvider extends ChangeNotifier {
   }
 
   Future<void> ensureAthleteId() async {
-    _athleteId ??= await _stravaService.getAthleteId();
+    print('[RunProvider] ensureAthleteId called');
+    if (_athleteId == null) {
+      print('[RunProvider] No athlete ID stored, fetching from Strava service...');
+      _athleteId = await _stravaService.getAthleteId();
+      print('[RunProvider] Got athlete ID: $_athleteId');
+    } else {
+      print('[RunProvider] Using existing athlete ID: $_athleteId');
+    }
   }
 } 

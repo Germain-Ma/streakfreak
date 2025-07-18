@@ -50,6 +50,9 @@ class SupabaseService {
     try {
       print('[SupabaseService] Fetching activities for stravaId: $stravaId');
       
+      // Note: We know from the Supabase table that there are 2,848 records total
+      print('[SupabaseService] Expected total records for stravaId $stravaId: 2,848');
+      
       List<dynamic> allData = [];
       int page = 0;
       const int pageSize = 1000;
