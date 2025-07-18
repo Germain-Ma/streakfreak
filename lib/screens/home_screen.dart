@@ -29,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('[HomeScreen] build called');
+    final runProvider = Provider.of<RunProvider>(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('StreakFreak'),
@@ -126,7 +126,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _tabs[_selectedIndex],
+      body: Column(
+        children: [
+          // Minimal test widget for Supabase fetch
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Supabase activities loaded: ${runProvider.activities.length}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
+            ),
+          ),
+          Expanded(child: _tabs[_selectedIndex]),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: 'Streak'),
