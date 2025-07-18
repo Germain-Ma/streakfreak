@@ -21,6 +21,18 @@ class _HomeScreenState extends State<HomeScreen> {
     InsightsScreen(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    print('[HomeScreen] initState called');
+    // Call loadRuns after the widget is built to ensure Provider is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('[HomeScreen] Post frame callback - calling loadRuns');
+      final runProvider = Provider.of<RunProvider>(context, listen: false);
+      runProvider.loadRuns();
+    });
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -40,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              'Supabase activities loaded: \\${runProvider.activities.length}',
+              'Supabase activities loaded: ${runProvider.activities.length}',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
             ),
           ),

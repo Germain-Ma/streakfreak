@@ -21,9 +21,9 @@
   <meta name="description" content="A new Flutter project.">
   
   <!-- Cache busting -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
+  <meta http-equiv="Expires" content="-1">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -44,7 +44,21 @@
   <script>
     // Cache busting - force fresh load
     console.log('Loading StreakFreak - CACHE BUST: ' + Date.now());
+    
+    // Clear any existing service workers
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    
+    // Load flutter_bootstrap.js with cache-busting timestamp
+    const script = document.createElement('script');
+    script.src = 'flutter_bootstrap.js?v=' + Date.now();
+    script.async = true;
+    document.body.appendChild(script);
   </script>
-  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
