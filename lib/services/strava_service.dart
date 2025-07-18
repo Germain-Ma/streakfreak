@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class StravaService {
   static const String clientId = '167512'; // Replace with your Strava Client ID
@@ -12,8 +13,17 @@ class StravaService {
   static const String activitiesUrl = 'https://www.strava.com/api/v3/athlete/activities';
   static const String athleteUrl = 'https://www.strava.com/api/v3/athlete';
 
+  String get _effectiveRedirectUri {
+    // For localhost development, use a different redirect URI
+    if (!kIsWeb) {
+      return 'http://localhost:3000/callback'; // Local development
+    }
+    return redirectUri; // Production
+  }
+
   Future<void> authenticate() async {
-    final url = Uri.parse('$authUrl?client_id=$clientId&response_type=code&redirect_uri=$redirectUri&approval_prompt=auto&scope=activity:read_all');
+    final url = Uri.parse('$authUrl?client_id=$clientId&response_type=code&redirect_uri=${Uri.encodeComponent(_effectiveRedirectUri)}&approval_prompt=auto&scope=activity:read_all');
+    print('[StravaService] Authenticating with URL: $url');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
@@ -23,6 +33,7 @@ class StravaService {
 
   Future<String?> exchangeCodeForToken(String code) async {
     print('[StravaService] Exchanging code for token with code: $code');
+    print('[StravaService] Using redirect URI: $_effectiveRedirectUri');
     final response = await http.post(
       Uri.parse(tokenUrl),
       body: {
@@ -30,7 +41,7 @@ class StravaService {
         'client_secret': clientSecret,
         'code': code,
         'grant_type': 'authorization_code',
-        'redirect_uri': redirectUri,
+        'redirect_uri': _effectiveRedirectUri,
       },
     );
     print('[StravaService] Token exchange response status: ${response.statusCode}');

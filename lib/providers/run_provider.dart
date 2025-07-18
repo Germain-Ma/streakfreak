@@ -408,7 +408,7 @@ class RunProvider extends ChangeNotifier {
     print('[RunProvider] >>>>> loadRuns CALLED, current _athleteId: $_athleteId <<<<<');
     await ensureAthleteId();
     
-    // If no athlete ID from Strava, try to load from local storage or use a default
+    // If no athlete ID from Strava, try to load from local storage
     if (_athleteId == null) {
       print('[RunProvider] No athlete ID from Strava, trying to load from local storage...');
       final prefs = await SharedPreferences.getInstance();
@@ -416,6 +416,7 @@ class RunProvider extends ChangeNotifier {
       
       if (_athleteId == null) {
         print('[RunProvider] No athlete ID found anywhere, cannot load activities');
+        print('[RunProvider] User needs to authenticate with Strava first');
         _activities = [];
         notifyListeners();
         return;
