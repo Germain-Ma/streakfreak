@@ -14,11 +14,9 @@ class StravaService {
   static const String athleteUrl = 'https://www.strava.com/api/v3/athlete';
 
   String get _effectiveRedirectUri {
-    // For localhost development, use a different redirect URI
-    if (!kIsWeb) {
-      return 'http://localhost:3000/callback'; // Local development
-    }
-    return redirectUri; // Production
+    // For localhost development, use the same redirect URI as production
+    // This allows the OAuth flow to work in the browser without needing a local server
+    return redirectUri; // Always use production redirect URI
   }
 
   Future<void> authenticate() async {

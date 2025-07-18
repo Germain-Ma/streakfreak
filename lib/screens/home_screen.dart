@@ -40,10 +40,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _onImportComplete(int total, int gps) {
-    print('[HomeScreen] Import completed: $total activities, $gps with GPS');
-    // Refresh the UI after import
-    setState(() {});
+  void _onImportComplete() {
+    print('[HomeScreen] Import completed');
+    // The RunProvider will have been updated by the StravaWebViewScreen
+    // No need to do anything else here
   }
 
   @override

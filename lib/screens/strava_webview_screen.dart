@@ -56,32 +56,19 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
 
   @override
   void initState() {
-    print('[StravaWebViewScreen] initState called');
     super.initState();
-    if (!kIsWeb) {
-      _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(NavigationDelegate(
-          onPageStarted: (url) {
-            if (url.contains('code=')) {
-              _handleStravaRedirect(url);
-            }
-          },
-        ));
+    print('[StravaWebViewScreen] initState called');
+    
+    // Check if we have a code parameter from OAuth redirect
+    final uri = Uri.parse(widget.initialUrl);
+    final code = uri.queryParameters['code'];
+    
+    if (code != null) {
+      print('[StravaWebViewScreen] Found code parameter: $code');
+      _handleStravaRedirect(code);
     } else {
-      // On web, check for code in URL
-      final code = Uri.base.queryParameters['code'];
-      final state = Uri.base.queryParameters['state'];
-      print('[StravaWebViewScreen] initState code param: $code, state param: $state');
-      if (code != null && code.isNotEmpty) {
-        if (!_isSuccess) {
-          _handleStravaRedirect(html.window.location.href);
-        }
-      } else {
-        // No code parameter - check if we have a stored token
-        print('[StravaWebViewScreen] No code parameter found - checking for stored token');
-        _checkForStoredToken();
-      }
+      print('[StravaWebViewScreen] No code parameter found checking for stored token');
+      _checkForStoredToken();
     }
   }
 
@@ -127,77 +114,47 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
     }
   }
 
-  Future<void> _handleStravaRedirect(String url) async {
-    print('[StravaWebViewScreen] _handleStravaRedirect called with url: $url');
-    final uri = Uri.parse(url);
-    final code = uri.queryParameters['code'];
-    final state = uri.queryParameters['state'];
-    print('[StravaWebViewScreen] code param: $code, state param: $state');
-    setState(() => _isLoading = true);
-    if (code == null || code.isEmpty) {
-      print('[StravaWebViewScreen] ERROR: code param is missing or empty in _handleStravaRedirect. Uri: $uri, query params: ${uri.queryParameters}');
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: Missing code parameter in Strava redirect. Please try again.')),
-      );
-      return;
-    }
+  Future<void> _handleStravaRedirect(String code) async {
+    print('[StravaWebViewScreen] _handleStravaRedirect called with code: $code');
     try {
-      // Exchange code for token
       final token = await _stravaService.exchangeCodeForToken(code);
+      print('[StravaWebViewScreen] Token exchange result: ${token != null ? "SUCCESS" : "FAILED"}');
+      
       if (token != null && !token.startsWith('Error:')) {
-        print('[StravaWebViewScreen] Token exchange successful, about to call loadRuns and smartSyncFromStrava');
-        try {
-          final runProvider = context.read<RunProvider>();
-          print('[StravaWebViewScreen] RunProvider read successfully: $runProvider');
-          await runProvider.loadRuns(); // Always fetch from Supabase first
-          print('[StravaWebViewScreen] loadRuns completed');
-          await runProvider.smartSyncFromStrava(afterOAuth: true); // Then sync with Strava
-          print('[StravaWebViewScreen] smartSyncFromStrava completed');
-          // Wait for GPS extraction
-          final locationProvider = context.read<LocationProvider>();
-          await locationProvider.refresh();
-          // Count total and GPS activities
-          int gpsCount = 0;
-          int total = 0;
-          try {
-            final activities = runProvider.activities;
-            final runs = runProvider.runs;
-            total = activities.length;
-            for (final run in runs) {
-              if (run.lat != 0.0 || run.lon != 0.0) {
-                gpsCount++;
-              }
-            }
-          } catch (e) {
-            print('[StravaWebViewScreen] ERROR accessing activities/runs: $e');
+        print('[StravaWebViewScreen] Token exchange successful, loading runs...');
+        final runProvider = Provider.of<RunProvider>(context, listen: false);
+        
+        // First load existing data from Supabase
+        await runProvider.loadRuns();
+        print('[StravaWebViewScreen] loadRuns completed');
+        
+        // Then sync new data from Strava
+        await runProvider.smartSyncFromStrava(afterOAuth: true);
+        print('[StravaWebViewScreen] smartSyncFromStrava completed');
+        
+        // Navigate back to home screen
+        if (mounted) {
+          Navigator.of(context).pop();
+          if (widget.onImportComplete != null) {
+            widget.onImportComplete!();
           }
-          setState(() {
-            _isSuccess = true;
-            _isLoading = false;
-            _total = total;
-            _gps = gpsCount;
-          });
-          widget.onImportComplete(_total, _gps);
-        } catch (e, stack) {
-          print('[StravaWebViewScreen] ERROR in loadRuns or smartSyncFromStrava call: $e');
-          print('[StravaWebViewScreen] Stack trace: $stack');
-          throw e; // Re-throw to be caught by outer try-catch
         }
       } else {
-        setState(() => _isLoading = false);
-        print('[StravaWebViewScreen] ERROR: Failed to connect to Strava: ${token ?? "Unknown error"}');
+        print('[StravaWebViewScreen] Token exchange failed: $token');
+        // Show error message to user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Strava authentication failed: $token')),
+          );
+        }
+      }
+    } catch (e) {
+      print('[StravaWebViewScreen] ERROR in _handleStravaRedirect: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to connect to Strava: ${token ?? "Unknown error"}')),
+          SnackBar(content: Text('Error during Strava authentication: $e')),
         );
       }
-    } catch (e, stack) {
-      setState(() => _isLoading = false);
-      print('[StravaWebViewScreen] Error importing from Strava: $e');
-      print('[StravaWebViewScreen] Stack trace: $stack');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error importing from Strava: $e')),
-      );
     }
   }
 
