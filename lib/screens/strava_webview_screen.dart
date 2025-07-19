@@ -68,15 +68,18 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
           },
         ));
     } else {
-      // On web, check for code in URL
+      // On web, check for Strava OAuth callback parameters
       final code = Uri.base.queryParameters['code'];
-      final state = Uri.base.queryParameters['state'];
-      if (code != null && code.isNotEmpty) {
+      final scope = Uri.base.queryParameters['scope'];
+      
+      // Only handle if this is a Strava OAuth callback (has activity:read_all scope)
+      if (code != null && code.isNotEmpty && 
+          scope != null && scope.contains('activity:read_all')) {
         if (!_isSuccess) {
           _handleStravaRedirect(html.window.location.href);
         }
       } else {
-        // No code parameter - check if we have a stored token
+        // No Strava OAuth callback - check if we have a stored token
         _checkForStoredToken();
       }
     }
