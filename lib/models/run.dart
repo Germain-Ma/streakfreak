@@ -30,56 +30,71 @@ class Run {
     this.maxHeartRate,
   });
 
-  static Run? fromCsv(Map<String, String> row) {
-    print('[Run.fromCsv] called with row: $row');
-    // --- BEGIN SKIPPED RUNS DEBUG ---
-    try {
-      final dateStr = row['Date'];
-      if (dateStr == null || dateStr.isEmpty) {
-        print('[Run.fromCsv] SKIPPED (missing date): $row');
-        return null;
-      }
-      DateTime? date;
-      try {
-        date = DateTime.parse(dateStr);
-      } catch (_) {
-        print('[Run.fromCsv] SKIPPED (invalid date "$dateStr"): $row');
-        return null;
-      }
-      final distanceKm = double.tryParse(row['Distance'] ?? '') ?? 0.0;
-      final title = row['Title'] ?? '';
-      final lat = double.tryParse(row['Start Latitude'] ?? '') ?? 0.0;
-      final lon = double.tryParse(row['Start Longitude'] ?? '') ?? 0.0;
-      final elevationGain = double.tryParse(row['Elevation Gain'] ?? '') ?? 0.0;
-      final movingTime = int.tryParse(row['Moving Time'] ?? '') ?? 0;
-      final elapsedTime = int.tryParse(row['Elapsed Time'] ?? '') ?? 0;
-      final avgSpeed = double.tryParse(row['Average Speed'] ?? '') ?? 0.0;
-      final maxSpeed = double.tryParse(row['Max Speed'] ?? '') ?? 0.0;
-      final calories = int.tryParse(row['Calories'] ?? '') ?? 0;
-      final stravaId = row['Strava ID'] ?? '';
-      final avgHeartRate = double.tryParse(row['Avg Heart Rate'] ?? '');
-      final maxHeartRate = double.tryParse(row['Max Heart Rate'] ?? '');
+  factory Run.fromCsv(Map<String, String> row) {
+    final dateStr = row['Date'];
+    if (dateStr == null || dateStr.isEmpty) {
       return Run(
-        date: date,
-        distanceKm: distanceKm,
-        lat: lat,
-        lon: lon,
-        title: title,
-        elevationGain: elevationGain,
-        movingTime: movingTime,
-        elapsedTime: elapsedTime,
-        avgSpeed: avgSpeed,
-        maxSpeed: maxSpeed,
-        calories: calories,
-        stravaId: stravaId,
-        avgHeartRate: avgHeartRate,
-        maxHeartRate: maxHeartRate,
+        date: DateTime.now(),
+        distanceKm: 0,
+        lat: 0,
+        lon: 0,
+        title: '',
+        elevationGain: 0,
+        movingTime: 0,
+        elapsedTime: 0,
+        avgSpeed: 0,
+        maxSpeed: 0,
+        calories: 0,
+        stravaId: '',
       );
-    } catch (e) {
-      print('[Run.fromCsv] SKIPPED (parse error): $row, error: $e');
-      return null;
     }
-    // --- END SKIPPED RUNS DEBUG ---
+
+    DateTime date;
+    try {
+      // Try parsing as ISO format first
+      date = DateTime.tryParse(dateStr) ?? DateTime.now();
+      if (date == DateTime.now()) {
+        // Try parsing as MM/DD/YYYY format
+        final parts = dateStr.split('/');
+        if (parts.length == 3) {
+          final month = int.parse(parts[0]);
+          final day = int.parse(parts[1]);
+          final year = int.parse(parts[2]);
+          date = DateTime(year, month, day);
+        }
+      }
+    } catch (e) {
+      // Return default run if date parsing fails
+      return Run(
+        date: DateTime.now(),
+        distanceKm: 0,
+        lat: 0,
+        lon: 0,
+        title: '',
+        elevationGain: 0,
+        movingTime: 0,
+        elapsedTime: 0,
+        avgSpeed: 0,
+        maxSpeed: 0,
+        calories: 0,
+        stravaId: '',
+      );
+    }
+
+    return Run(
+      date: date,
+      distanceKm: double.tryParse(row['Distance'] ?? '0') ?? 0,
+      lat: double.tryParse(row['Start Latitude'] ?? '0') ?? 0,
+      lon: double.tryParse(row['Start Longitude'] ?? '0') ?? 0,
+      title: row['Title'] ?? '',
+      elevationGain: double.tryParse(row['Elevation Gain'] ?? '0') ?? 0,
+      movingTime: int.tryParse(row['Moving Time'] ?? '0') ?? 0,
+      elapsedTime: int.tryParse(row['Elapsed Time'] ?? '0') ?? 0,
+      avgSpeed: double.tryParse(row['Average Speed'] ?? '0') ?? 0,
+      maxSpeed: double.tryParse(row['Max Speed'] ?? '0') ?? 0,
+      calories: int.tryParse(row['Calories'] ?? '0') ?? 0,
+      stravaId: row['Strava ID'] ?? '',
+    );
   }
 
   Map<String, dynamic> toJson() => {

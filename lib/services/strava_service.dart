@@ -12,8 +12,14 @@ class StravaService {
   static const String activitiesUrl = 'https://www.strava.com/api/v3/athlete/activities';
   static const String athleteUrl = 'https://www.strava.com/api/v3/athlete';
 
+  String get _effectiveRedirectUri {
+    // For localhost development, use the same redirect URI as production
+    // This allows the OAuth flow to work in the browser without needing a local server
+    return redirectUri; // Always use production redirect URI
+  }
+
   Future<void> authenticate() async {
-    final url = Uri.parse('$authUrl?client_id=$clientId&response_type=code&redirect_uri=$redirectUri&approval_prompt=auto&scope=activity:read_all');
+    final url = Uri.parse('$authUrl?client_id=$clientId&response_type=code&redirect_uri=${Uri.encodeComponent(_effectiveRedirectUri)}&approval_prompt=auto&scope=activity:read_all');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
@@ -22,7 +28,6 @@ class StravaService {
   }
 
   Future<String?> exchangeCodeForToken(String code) async {
-    print('[StravaService] Exchanging code for token with code: $code');
     final response = await http.post(
       Uri.parse(tokenUrl),
       body: {
@@ -30,11 +35,10 @@ class StravaService {
         'client_secret': clientSecret,
         'code': code,
         'grant_type': 'authorization_code',
-        'redirect_uri': redirectUri,
+        'redirect_uri': _effectiveRedirectUri,
       },
     );
-    print('[StravaService] Token exchange response status: ${response.statusCode}');
-    print('[StravaService] Token exchange response body: ${response.body}');
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final prefs = await SharedPreferences.getInstance();
@@ -44,9 +48,6 @@ class StravaService {
       await fetchAndStoreAthleteId();
       return data['access_token'];
     } else {
-      print('Strava token exchange failed: ${response.statusCode}');
-      print('Response body: ${response.body}');
-      // Optionally, return the error message for UI display
       try {
         final error = jsonDecode(response.body);
         return 'Error: ${error['message'] ?? response.body}';
@@ -63,20 +64,16 @@ class StravaService {
 
   Future<List<Map<String, dynamic>>> fetchActivities() async {
     final accessToken = await getAccessToken();
-    print('[StravaService] Fetching activities with accessToken: $accessToken');
     if (accessToken == null) return [];
     List<Map<String, dynamic>> allActivities = [];
     int page = 1;
     const int perPage = 200;
     while (true) {
       final url = '$activitiesUrl?per_page=$perPage&page=$page';
-      print('[StravaService] Fetching activities from: $url');
       final response = await http.get(
         Uri.parse(url),
         headers: {'Authorization': 'Bearer $accessToken'},
       );
-      print('[StravaService] Activities fetch response status: ${response.statusCode}');
-      print('[StravaService] Activities fetch response body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is List && data.isNotEmpty) {

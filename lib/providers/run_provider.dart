@@ -10,6 +10,7 @@ import '../services/strava_service.dart';
 // import '../services/web_geocoding_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/supabase_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RunProvider extends ChangeNotifier {
   final CsvService _csvService = CsvService();
@@ -39,27 +40,7 @@ class RunProvider extends ChangeNotifier {
   List<Activity> get activities => _activities;
 
   List<Run> get runs {
-    print('[RunProvider.runs] getter called, _activities.length: ${_activities.length}');
     runsGetterCallCount++;
-    if (runsGetterCallCount == 1) {
-      print('Total activities: ' + _activities.length.toString());
-      final validRuns = _activities.map((a) {
-        try {
-          final type = (a.fields['Activity Type'] ?? '').toLowerCase();
-          if (!type.contains('run')) return null;
-          return Run.fromCsv(a.fields);
-        } catch (e) {
-          print('Skipped activity: $a, error: $e');
-          return null;
-        }
-      }).whereType<Run>().toList();
-      print('Parsed runs: ' + validRuns.length.toString());
-      return validRuns;
-    } else if (runsGetterCallCount == 2) {
-      print('runs getter called 2 times');
-    } else if (runsGetterCallCount % 10 == 0) {
-      print('runs getter called $runsGetterCallCount times');
-    }
     final validRuns = _activities.map((a) {
       try {
         final type = (a.fields['Activity Type'] ?? '').toLowerCase();
@@ -74,7 +55,6 @@ class RunProvider extends ChangeNotifier {
 
   // Computed stats
   int get streak {
-    print('[RunProvider.streak] getter called');
     final r = runs;
     if (r.isEmpty) return 0;
     r.sort((a, b) => b.date.compareTo(a.date));
@@ -91,14 +71,12 @@ class RunProvider extends ChangeNotifier {
   }
 
   double get totalKm {
-    print('[RunProvider.totalKm] getter called');
     final r = runs;
     if (r.isEmpty) return 0.0;
     return r.fold(0.0, (sum, r) => sum + r.distanceKm);
   }
 
   double get avgKmPerDay {
-    print('[RunProvider.avgKmPerDay] getter called');
     final r = runs;
     if (r.isEmpty) return 0.0;
     final days = r.last.date.difference(r.first.date).inDays + 1;
@@ -106,36 +84,16 @@ class RunProvider extends ChangeNotifier {
   }
 
   DateTime? get firstDay {
-    print('[RunProvider.firstDay] getter called');
     final r = runs;
     return r.isEmpty ? null : r.map((r) => r.date).reduce((a, b) => a.isBefore(b) ? a : b);
   }
 
   void debugPrintAllActivities() {
-    final allRuns = runs;
-    final withGps = allRuns.where((r) => r.lat != 0.0 || r.lon != 0.0).length;
-    final withoutGps = allRuns.length - withGps;
-    print('--- DEBUG: Activities Summary ---');
-    print('Total runs: ${allRuns.length}');
-    print('Runs with GPS: $withGps');
-    print('Runs without GPS: $withoutGps');
-    if (allRuns.isNotEmpty) {
-      print('First 2 runs:');
-      for (final run in allRuns.take(2)) {
-        print('  Date: ${run.date.toIso8601String()}, Distance: ${run.distanceKm}, Title: ${run.title}');
-      }
-      print('Last 2 runs:');
-      for (final run in allRuns.reversed.take(2)) {
-        print('  Date: ${run.date.toIso8601String()}, Distance: ${run.distanceKm}, Title: ${run.title}');
-      }
-    }
-    print('--- END DEBUG ---');
+    // Removed debug prints
   }
 
   /// Import activities from Strava API
   Future<void> importFromStrava() async {
-    print('[importFromStrava] ENTERED, athleteId:  [36m$_athleteId [0m');
-    print('[importFromStrava] START');
     _isImporting = true;
     _importProgress = 0;
     _importTotal = 0;
@@ -143,22 +101,17 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
 
     await ensureAthleteId();
-    print('[importFromStrava] athleteId: $_athleteId');
     if (_athleteId == null) {
-      print('[importFromStrava] ERROR: Could not determine Strava athlete ID.');
       _importStatus = 'Could not determine Strava athlete ID.';
       notifyListeners();
       return;
     }
 
-    print('[importFromStrava] Fetching activities from Strava...');
     final stravaActivities = await _stravaService.fetchActivities();
-    print('[importFromStrava] Activities fetched: ${stravaActivities.length}');
     final filteredActivities = stravaActivities.where((a) {
       final type = (a['type'] ?? '').toString().toLowerCase();
       return type == 'run' || type == 'trailrun';
     }).toList();
-    print('[importFromStrava] Filtered activities: ${filteredActivities.length}');
 
     _importTotal = filteredActivities.length;
     _importStatus = 'Syncing activities from Strava... (${_importProgress}/${_importTotal})';
@@ -189,28 +142,22 @@ class RunProvider extends ChangeNotifier {
         'Average Speed': (a['average_speed'] ?? '').toString(),
         'Max Speed': (a['max_speed'] ?? '').toString(),
         'Calories': (a['calories'] ?? '').toString(),
-        // 'Country': country ?? '',
         'Avg Heart Rate': avgHeartRate ?? '',
         'Max Heart Rate': maxHeartRate ?? '',
       };
       newActivities.add(Activity(fields));
       _importProgress = i + 1;
       _importStatus = 'Syncing activities from Strava... (${_importProgress}/${_importTotal})';
-      if (i % 100 == 0) print('[importFromStrava] Processed activity $i/${filteredActivities.length}');
       notifyListeners();
     }
-    print('[importFromStrava] All activities processed.');
 
     _importStatus = 'Uploading to cloud...';
     notifyListeners();
     _isSyncingCloud = true;
     try {
       _activities = newActivities;
-      print('[importFromStrava] Saving activities locally...');
       await _storageService.saveActivities(_athleteId!, _activities);
-      print('[importFromStrava] Uploading activities to Supabase...');
       await _supabaseService.uploadActivities(_athleteId!, _activities);
-      print('[importFromStrava] Upload complete.');
     } finally {
       _isSyncingCloud = false;
       notifyListeners();
@@ -220,8 +167,6 @@ class RunProvider extends ChangeNotifier {
     notifyListeners();
 
     debugPrintAllActivities();
-    print('[importFromStrava] END');
-    // Remove country statistics debug output
     _isImporting = false;
     _importProgress = 0;
     _importTotal = 0;
@@ -231,11 +176,24 @@ class RunProvider extends ChangeNotifier {
 
   Future<void> loadRuns() async {
     await ensureAthleteId();
+    
+    // If no athlete ID from Strava, try to load from local storage or use a default
+    if (_athleteId == null) {
+      final prefs = await SharedPreferences.getInstance();
+      _athleteId = prefs.getString('strava_athlete_id');
+      
+      if (_athleteId == null) {
+        // Fallback athlete ID for localhost development (from working web app)
+        _athleteId = '44189670';
+      }
+    }
+    
     if (_athleteId == null) {
       _activities = [];
       notifyListeners();
       return;
     }
+    
     _isSyncingCloud = true;
     notifyListeners();
     try {

@@ -10,10 +10,9 @@ import 'dart:async';
 import 'dart:html' as html;
 
 class StravaWebViewScreen extends StatefulWidget {
-  final void Function(int total, int gps) onImportComplete;
-  StravaWebViewScreen({super.key, required this.onImportComplete}) {
-    print('[StravaWebViewScreen] constructor called');
-  }
+  final void Function()? onImportComplete;
+  
+  StravaWebViewScreen({super.key, this.onImportComplete});
 
   @override
   State<StravaWebViewScreen> createState() => _StravaWebViewScreenState();
@@ -56,8 +55,8 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
 
   @override
   void initState() {
-    print('[StravaWebViewScreen] initState called');
     super.initState();
+    
     if (!kIsWeb) {
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -72,28 +71,63 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       // On web, check for code in URL
       final code = Uri.base.queryParameters['code'];
       final state = Uri.base.queryParameters['state'];
-      print('[StravaWebViewScreen] initState code param: $code, state param: $state');
       if (code != null && code.isNotEmpty) {
         if (!_isSuccess) {
           _handleStravaRedirect(html.window.location.href);
         }
       } else {
-        // No code parameter - this is normal on app startup, not an error
-        print('[StravaWebViewScreen] No code parameter found - normal app startup');
+        // No code parameter - check if we have a stored token
+        _checkForStoredToken();
       }
     }
   }
 
+  Future<void> _checkForStoredToken() async {
+    final token = await _stravaService.getAccessToken();
+    
+    if (token != null && token.isNotEmpty && !token.startsWith('Error:')) {
+      setState(() => _isLoading = true);
+      try {
+        final runProvider = Provider.of<RunProvider>(context, listen: false);
+        await runProvider.importFromStrava();
+        final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+        await locationProvider.refresh();
+        
+        final activities = runProvider.activities;
+        final runs = runProvider.runs;
+        int gpsCount = 0;
+        for (final run in runs) {
+          if (run.lat != 0.0 || run.lon != 0.0) {
+            gpsCount++;
+          }
+        }
+        
+        setState(() {
+          _isSuccess = true;
+          _isLoading = false;
+          _total = activities.length;
+          _gps = gpsCount;
+        });
+        
+        if (widget.onImportComplete != null) {
+          widget.onImportComplete!();
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error importing activities: $e')),
+        );
+      }
+    } else {
+    }
+  }
+
   Future<void> _handleStravaRedirect(String url) async {
-    print('[StravaWebViewScreen] _handleStravaRedirect called with url: $url');
     final uri = Uri.parse(url);
     final code = uri.queryParameters['code'];
     final state = uri.queryParameters['state'];
-    print('[StravaWebViewScreen] code param: $code, state param: $state');
     setState(() => _isLoading = true);
     if (code == null || code.isEmpty) {
-      print('[StravaWebViewScreen] ERROR: code param is missing or empty in _handleStravaRedirect. Uri: $uri, query params: ${uri.queryParameters}');
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: Missing code parameter in Strava redirect. Please try again.')),
       );
@@ -103,40 +137,45 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
       // Exchange code for token
       final token = await _stravaService.exchangeCodeForToken(code);
       if (token != null && !token.startsWith('Error:')) {
-        // Import activities from Strava
-        final runProvider = context.read<RunProvider>();
-        await runProvider.importFromStrava();
-        // Wait for GPS extraction
-        final locationProvider = context.read<LocationProvider>();
-        await locationProvider.refresh();
-        // Count total and GPS activities
-        final activities = runProvider.activities;
-        final runs = runProvider.runs;
-        int gpsCount = 0;
-        for (final run in runs) {
-          if (run.lat != 0.0 || run.lon != 0.0) {
-            gpsCount++;
+        try {
+          final runProvider = Provider.of<RunProvider>(context, listen: false);
+          await runProvider.loadRuns(); // Always fetch from Supabase first
+          await runProvider.importFromStrava(); // Then sync with Strava
+          // Wait for GPS extraction
+          final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+          await locationProvider.refresh();
+          // Count total and GPS activities
+          int gpsCount = 0;
+          int total = 0;
+          try {
+            final activities = runProvider.activities;
+            final runs = runProvider.runs;
+            total = activities.length;
+            for (final run in runs) {
+              if (run.lat != 0.0 || run.lon != 0.0) {
+                gpsCount++;
+              }
+            }
+          } catch (e) {
           }
+          setState(() {
+            _isSuccess = true;
+            _isLoading = false;
+            _total = total;
+            _gps = gpsCount;
+          });
+          if (widget.onImportComplete != null) {
+            widget.onImportComplete!();
+          }
+        } catch (e, stack) {
+          throw e; // Re-throw to be caught by outer try-catch
         }
-        setState(() {
-          _isSuccess = true;
-          _isLoading = false;
-          _total = activities.length;
-          _gps = gpsCount;
-        });
-        widget.onImportComplete(_total, _gps);
       } else {
-        // Handle error
-        setState(() => _isLoading = false);
-        print('[StravaWebViewScreen] ERROR: Failed to connect to Strava: ${token ?? "Unknown error"}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to connect to Strava: ${token ?? "Unknown error"}')),
         );
       }
     } catch (e, stack) {
-      setState(() => _isLoading = false);
-      print('[StravaWebViewScreen] Error importing from Strava: $e');
-      print('[StravaWebViewScreen] Stack trace: $stack');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error importing from Strava: $e')),
       );
@@ -152,7 +191,6 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('[StravaWebViewScreen] build called (import screen)');
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -184,7 +222,6 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
                         shadowColor: Colors.black26,
                       ),
                       onPressed: () {
-                        print('[StravaWebViewScreen] Strava sync button pressed');
                         _startWebOAuth();
                       },
                       child: const Text('Connect to Strava', style: TextStyle(fontSize: 18)),

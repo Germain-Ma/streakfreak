@@ -15,45 +15,32 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
-  Future<void> uploadActivities(String stravaId, List<Activity> activities, {bool uploadIndividually = false}) async {
-    await init();
-    if (uploadIndividually) {
+  Future<void> uploadActivities(String athleteId, List<Activity> activities) async {
+    try {
+      await init();
       for (final activity in activities) {
-        try {
-          await client.from('activities').upsert([{
-            'strava_id': stravaId,
-            'activity_id': activity.id,
-            'data': activity.toJson(),
-          }], onConflict: 'strava_id,activity_id');
-        } catch (e) {
-          print('[Supabase upload error for activity ${activity.id}]: $e');
-        }
+        await client.from('activities').upsert({
+          'strava_id': athleteId,
+          'activity_id': activity.fields['Strava ID'],
+          'data': activity.fields,
+        });
       }
-    } else {
-      try {
-        await client.from('activities').upsert(
-          activities.where((a) => a.id != null).map((a) => {
-            'strava_id': stravaId,
-            'activity_id': a.id,
-            'data': a.toJson(),
-          }).toList(),
-          onConflict: 'strava_id,activity_id',
-        );
-      } catch (e) {
-        print('[Supabase upload error]: $e');
-      }
+    } catch (e) {
+      // Silently handle upload errors
     }
   }
 
-  Future<List<Activity>> fetchActivities(String stravaId) async {
-    await init();
+  Future<List<Activity>> fetchActivities(String athleteId) async {
     try {
-      final data = await client.from('activities').select('data').eq('strava_id', stravaId);
-      if (data == null || data is! List) return [];
-      return data.map<Activity>((row) => Activity.fromJson(row['data'])).toList();
+      await init();
+      final response = await client
+          .from('activities')
+          .select('data')
+          .eq('strava_id', athleteId);
+      
+      return response.map((row) => Activity(Map<String, String>.from(row['data']))).toList();
     } catch (e) {
-      print('[Supabase fetch error]: $e');
-      throw Exception('Supabase fetch error: $e');
+      return [];
     }
   }
 } 
