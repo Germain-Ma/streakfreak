@@ -129,24 +129,39 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
     final uri = Uri.parse(url);
     final code = uri.queryParameters['code'];
     final state = uri.queryParameters['state'];
+    
+    if (!mounted) return; // Check if widget is still mounted
+    
     setState(() => _isLoading = true);
+    
     if (code == null || code.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: Missing code parameter in Strava redirect. Please try again.')),
       );
       return;
     }
+    
     try {
       // Exchange code for token
       final token = await _stravaService.exchangeCodeForToken(code);
+      
+      if (!mounted) return; // Check again after async operation
+      
       if (token != null && !token.startsWith('Error:')) {
         try {
           final runProvider = Provider.of<RunProvider>(context, listen: false);
           await runProvider.loadRuns(); // Always fetch from Supabase first
           await runProvider.importFromStrava(); // Then sync with Strava
+          
+          if (!mounted) return; // Check after async operations
+          
           // Wait for GPS extraction
           final locationProvider = Provider.of<LocationProvider>(context, listen: false);
           await locationProvider.refresh();
+          
+          if (!mounted) return; // Check after async operations
+          
           // Count total and GPS activities
           int gpsCount = 0;
           int total = 0;
@@ -161,12 +176,16 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
             }
           } catch (e) {
           }
+          
+          if (!mounted) return; // Final check before setState
+          
           setState(() {
             _isSuccess = true;
             _isLoading = false;
             _total = total;
             _gps = gpsCount;
           });
+          
           if (widget.onImportComplete != null) {
             widget.onImportComplete!();
           }
@@ -174,11 +193,13 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
           throw e; // Re-throw to be caught by outer try-catch
         }
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to connect to Strava: ${token ?? "Unknown error"}')),
         );
       }
     } catch (e, stack) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error importing from Strava: $e')),
       );

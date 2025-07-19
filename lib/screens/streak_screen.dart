@@ -9,11 +9,12 @@ class StreakScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final runProvider = Provider.of<RunProvider>(context);
+    final longestStreak = runProvider.longestStreak;
     final currentStreak = runProvider.currentStreak;
-    final currentStreakFirstDay = runProvider.currentStreakFirstDay;
-    final currentStreakLastDay = runProvider.currentStreakLastDay;
-    final currentStreakTotalKm = runProvider.currentStreakTotalKm;
-    final currentStreakAvgKm = runProvider.currentStreakAvgKm;
+    final totalKm = runProvider.totalKm;
+    final avgKmPerDay = runProvider.avgKmPerDay;
+    final firstDay = runProvider.firstDay;
+    final lastDay = runProvider.runs.isNotEmpty ? runProvider.runs.first.date : null;
 
     return Scaffold(
       backgroundColor: const Color(0xFF181A20),
@@ -44,24 +45,29 @@ class StreakScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
-                          'Current Streak',
+                          'Longest Streak',
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '$currentStreak days',
+                          '$longestStreak days',
                           style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Current: $currentStreak days',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white70),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 32),
                   _buildStreakTable([
-                    ['Days', currentStreak],
-                    ['From', currentStreakFirstDay != null ? DateFormat.yMMMd().format(currentStreakFirstDay) : '-'],
-                    ['To', currentStreakLastDay != null ? DateFormat.yMMMd().format(currentStreakLastDay) : '-'],
-                    ['Total km', currentStreakTotalKm.toStringAsFixed(2)],
-                    ['Avg km/day', currentStreakAvgKm.toStringAsFixed(2)],
+                    ['Days', longestStreak],
+                    ['From', firstDay != null ? DateFormat.yMMMd().format(firstDay) : '-'],
+                    ['To', lastDay != null ? DateFormat.yMMMd().format(lastDay) : '-'],
+                    ['Total km', totalKm.toStringAsFixed(2)],
+                    ['Avg km/day', avgKmPerDay.toStringAsFixed(2)],
                   ]),
                 ],
               ),

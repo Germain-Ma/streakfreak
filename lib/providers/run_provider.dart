@@ -70,6 +70,37 @@ class RunProvider extends ChangeNotifier {
     return streak;
   }
 
+  // Get the longest streak ever achieved
+  int get longestStreak {
+    final r = runs;
+    if (r.isEmpty) return 0;
+    
+    // Sort by date (oldest first)
+    r.sort((a, b) => a.date.compareTo(b.date));
+    
+    int currentStreak = 1;
+    int longestStreak = 1;
+    
+    for (int i = 1; i < r.length; i++) {
+      final diff = r[i].date.difference(r[i - 1].date).inDays;
+      if (diff == 1) {
+        currentStreak++;
+        if (currentStreak > longestStreak) {
+          longestStreak = currentStreak;
+        }
+      } else {
+        currentStreak = 1;
+      }
+    }
+    
+    return longestStreak;
+  }
+
+  // Get current streak (consecutive days from most recent run)
+  int get currentStreak {
+    return streak; // This is the existing logic
+  }
+
   double get totalKm {
     final r = runs;
     if (r.isEmpty) return 0.0;
