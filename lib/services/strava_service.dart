@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class StravaService {
   static const String clientId = '167512'; // Replace with your Strava Client ID
@@ -13,9 +14,11 @@ class StravaService {
   static const String athleteUrl = 'https://www.strava.com/api/v3/athlete';
 
   String get _effectiveRedirectUri {
-    // For localhost development, use the same redirect URI as production
-    // This allows the OAuth flow to work in the browser without needing a local server
-    return redirectUri; // Always use production redirect URI
+    // Use different redirect URIs for localhost vs web deployment
+    if (kIsWeb && Uri.base.host == 'localhost') {
+      return 'http://localhost:3000';
+    }
+    return redirectUri; // Use production redirect URI for deployed web app
   }
 
   Future<void> authenticate() async {

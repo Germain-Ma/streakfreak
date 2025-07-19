@@ -185,7 +185,13 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
   void _startWebOAuth() {
     if (_oauthStarted) return;
     _oauthStarted = true;
-    final url = 'https://www.strava.com/oauth/authorize?client_id=167512&response_type=code&redirect_uri=https://germain-ma.github.io/streakfreak&approval_prompt=auto&scope=activity:read_all';
+    
+    // Use different redirect URIs for localhost vs web deployment
+    final redirectUri = kIsWeb && Uri.base.host != 'localhost' 
+        ? 'https://germain-ma.github.io/streakfreak'
+        : 'http://localhost:3000';
+    
+    final url = 'https://www.strava.com/oauth/authorize?client_id=167512&response_type=code&redirect_uri=${Uri.encodeComponent(redirectUri)}&approval_prompt=auto&scope=activity:read_all';
     html.window.open(url, '_self');
   }
 
@@ -237,7 +243,12 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
                         shadowColor: Colors.black26,
                       ),
                       onPressed: () {
-                        _controller.loadRequest(Uri.parse('https://www.strava.com/oauth/authorize?client_id=167512&response_type=code&redirect_uri=https://germain-ma.github.io/streakfreak&approval_prompt=auto&scope=activity:read_all'));
+                        // Use different redirect URIs for localhost vs web deployment
+                        final redirectUri = Uri.base.host == 'localhost' 
+                            ? 'http://localhost:3000'
+                            : 'https://germain-ma.github.io/streakfreak';
+                        
+                        _controller.loadRequest(Uri.parse('https://www.strava.com/oauth/authorize?client_id=167512&response_type=code&redirect_uri=${Uri.encodeComponent(redirectUri)}&approval_prompt=auto&scope=activity:read_all'));
                       },
                       child: const Text('Connect to Strava', style: TextStyle(fontSize: 18)),
                     ),
