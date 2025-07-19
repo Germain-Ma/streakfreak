@@ -8,8 +8,12 @@ class SupabaseService {
 
   static Future<void> init() async {
     if (!_initialized) {
-      await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-      _initialized = true;
+      try {
+        await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+        _initialized = true;
+      } catch (e) {
+        throw e;
+      }
     }
   }
 
@@ -41,6 +45,15 @@ class SupabaseService {
       return response.map((row) => Activity(Map<String, String>.from(row['data']))).toList();
     } catch (e) {
       return [];
+    }
+  }
+
+  Future<void> deleteActivity(String stravaId, String activityId) async {
+    await init();
+    try {
+      await client.from('activities').delete().eq('strava_id', stravaId).eq('activity_id', activityId);
+    } catch (e) {
+      // Silently handle delete errors
     }
   }
 } 
