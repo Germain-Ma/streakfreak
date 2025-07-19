@@ -257,6 +257,12 @@ class RunProvider extends ChangeNotifier {
   int get currentStreak {
     final r = _sortedQualifiedRuns;
     if (r.isEmpty) return 0;
+    final today = DateTime.now();
+    final mostRecent = r.first.date;
+    // Only count streak if most recent run is today
+    if (!(mostRecent.year == today.year && mostRecent.month == today.month && mostRecent.day == today.day)) {
+      return 0;
+    }
     int streak = 1;
     for (int i = 1; i < r.length; i++) {
       final diff = r[i - 1].date.difference(r[i].date).inDays;

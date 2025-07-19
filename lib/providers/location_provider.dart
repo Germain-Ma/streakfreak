@@ -13,6 +13,8 @@ class LocationProvider with ChangeNotifier {
 
   void updateRunProvider(RunProvider runProvider) {
     _runProvider = runProvider;
+    // Refresh points when run provider is updated
+    refresh();
   }
 
   Future<void> refresh() async {
@@ -33,6 +35,10 @@ class LocationProvider with ChangeNotifier {
         withoutGps++;
       }
     }
+
+    // Debug output
+    // ignore: avoid_print
+    print('[LocationProvider] Runs with GPS: $withGps, without GPS: $withoutGps, total: ${runs.length}');
 
     _points = points;
     notifyListeners();

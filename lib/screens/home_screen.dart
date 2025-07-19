@@ -4,6 +4,7 @@ import 'map_screen.dart';
 import 'insights_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/run_provider.dart';
+import '../providers/location_provider.dart';
 import 'strava_webview_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,9 +21,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     // Automatically load runs when the screen is initialized
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final runProvider = Provider.of<RunProvider>(context, listen: false);
-      runProvider.loadRuns();
+      await runProvider.loadRuns();
+      
+      // Refresh location provider after runs are loaded
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      await locationProvider.refresh();
     });
   }
 
@@ -50,36 +55,42 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('StreakFreak'),
       ),
-      body: Column(
-        children: [
-          // Supabase activities count
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Supabase activities loaded: ${runProvider.activities.length}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
-            ),
-          ),
-          // Connect Strava button if no activities
-          if (runProvider.activities.isEmpty)
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Supabase activities count
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => StravaWebViewScreen(
-                        onImportComplete: _onImportComplete,
-                      ),
-                    ),
-                  );
-                },
-                child: const Text('Connect Strava to Load Your Activities'),
+              child: Text(
+                'Supabase activities loaded: ${runProvider.activities.length}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
               ),
             ),
-          Expanded(child: _tabs[_selectedIndex]),
-        ],
+            // Connect Strava button if no activities
+            if (runProvider.activities.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StravaWebViewScreen(
+                          onImportComplete: _onImportComplete,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Connect Strava to Load Your Activities'),
+                ),
+              ),
+            // Tab content with fixed height to prevent overflow
+            SizedBox(
+              height: MediaQuery.of(context).size.height - 200, // Adjust height to fit screen
+              child: _tabs[_selectedIndex],
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[

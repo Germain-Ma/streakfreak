@@ -58,7 +58,10 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => RunProvider()),
         ChangeNotifierProxyProvider<RunProvider, LocationProvider>(
           create: (_) => LocationProvider(null),
-          update: (_, runProv, __) => LocationProvider(runProv),
+          update: (_, runProv, locationProv) {
+            locationProv?.updateRunProvider(runProv);
+            return locationProv ?? LocationProvider(runProv);
+          },
         ),
       ],
       child: MaterialApp(

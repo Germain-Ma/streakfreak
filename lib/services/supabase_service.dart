@@ -37,12 +37,21 @@ class SupabaseService {
   Future<List<Activity>> fetchActivities(String athleteId) async {
     try {
       await init();
-      final response = await client
-          .from('activities')
-          .select('data')
-          .eq('strava_id', athleteId);
-      
-      return response.map((row) => Activity(Map<String, String>.from(row['data']))).toList();
+      List<Activity> allActivities = [];
+      int batchSize = 1000;
+      int start = 0;
+      while (true) {
+        final response = await client
+            .from('activities')
+            .select('data')
+            .eq('strava_id', athleteId)
+            .range(start, start + batchSize - 1);
+        final batch = response.map((row) => Activity(Map<String, String>.from(row['data']))).toList();
+        allActivities.addAll(batch);
+        if (batch.length < batchSize) break;
+        start += batchSize;
+      }
+      return allActivities;
     } catch (e) {
       return [];
     }
