@@ -28,11 +28,16 @@ class MapScreen extends StatelessWidget {
           boundsOptions: const FitBoundsOptions(padding: EdgeInsets.zero, maxZoom: 18.0),
         ),
         children: [
-          // Dark tile layer (CartoDB Dark Matter)
+          // Dark tile layer (CartoDB Dark Matter) - Fixed URL template
           TileLayer(
-            urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
             subdomains: const ['a', 'b', 'c', 'd'],
             backgroundColor: const Color(0xFF181A20),
+            // Add error handling for tile loading
+            errorTileCallback: (tile, error, stackTrace) {
+              // ignore: avoid_print
+              print('[MapScreen] Tile loading error: $error for tile: ${tile.coordinates}');
+            },
           ),
           MarkerLayer(
             markers: points

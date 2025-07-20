@@ -185,7 +185,15 @@ class RunProvider extends ChangeNotifier {
       if (_athleteId == null) {
         // Fallback athlete ID for localhost development (from working web app)
         _athleteId = '44189670';
+        // ignore: avoid_print
+        print('[RunProvider] Using fallback athlete ID: $_athleteId');
+      } else {
+        // ignore: avoid_print
+        print('[RunProvider] Using stored athlete ID: $_athleteId');
       }
+    } else {
+      // ignore: avoid_print
+      print('[RunProvider] Using Strava athlete ID: $_athleteId');
     }
     
     if (_athleteId == null) {
@@ -199,6 +207,8 @@ class RunProvider extends ChangeNotifier {
     try {
       // Fetch from Supabase
       final cloudActivities = await _supabaseService.fetchActivities(_athleteId!);
+      // ignore: avoid_print
+      print('[RunProvider] Loaded ${cloudActivities.length} activities from Supabase for athlete $_athleteId');
       // Optionally merge with local
       _activities = cloudActivities;
       await _storageService.saveActivities(_athleteId!, _activities);
@@ -251,11 +261,11 @@ class RunProvider extends ChangeNotifier {
 
   // --- New Streak and Stats Logic ---
   // Helper: Get sorted qualified runs (descending by date)
-  List<Run> get _sortedQualifiedRuns => _qualifiedRuns;
+  List<Run> get sortedQualifiedRuns => _qualifiedRuns;
 
   // Current streak (consecutive days up to most recent)
   int get currentStreak {
-    final r = _sortedQualifiedRuns;
+    final r = sortedQualifiedRuns;
     if (r.isEmpty) return 0;
     final today = DateTime.now();
     final mostRecent = r.first.date;
@@ -277,7 +287,7 @@ class RunProvider extends ChangeNotifier {
 
   // Longest streak (anywhere in the data)
   int get longestStreak {
-    final r = _sortedQualifiedRuns;
+    final r = sortedQualifiedRuns;
     if (r.isEmpty) return 0;
     int maxStreak = 1;
     int streak = 1;
@@ -290,12 +300,14 @@ class RunProvider extends ChangeNotifier {
         streak = 1;
       }
     }
+    // ignore: avoid_print
+    print('[RunProvider] Longest streak calculated: $maxStreak days from ${r.length} qualified runs');
     return maxStreak;
   }
 
   // Current streak stats
   List<Run> get currentStreakRuns {
-    final r = _sortedQualifiedRuns;
+    final r = sortedQualifiedRuns;
     if (r.isEmpty) return [];
     List<Run> streakRuns = [r.first];
     for (int i = 1; i < r.length; i++) {
@@ -319,7 +331,7 @@ class RunProvider extends ChangeNotifier {
   double get allTimeAvgKm => runs.isEmpty ? 0.0 : allTimeTotalKm / runs.length;
 
   DateTime? get longestStreakFirstDay {
-    final runs = _sortedQualifiedRuns;
+    final runs = sortedQualifiedRuns;
     if (runs.isEmpty) return null;
     int maxStreak = 1, streak = 1, maxStart = 0, maxEnd = 0, start = 0;
     for (int i = 1; i < runs.length; i++) {
@@ -341,11 +353,11 @@ class RunProvider extends ChangeNotifier {
       maxStart = start;
       maxEnd = runs.length - 1;
     }
-    return runs[maxEnd].date;
+    return runs[maxStart].date; // Return the start of the streak
   }
 
   DateTime? get longestStreakLastDay {
-    final runs = _sortedQualifiedRuns;
+    final runs = sortedQualifiedRuns;
     if (runs.isEmpty) return null;
     int maxStreak = 1, streak = 1, maxStart = 0, maxEnd = 0, start = 0;
     for (int i = 1; i < runs.length; i++) {
@@ -367,7 +379,7 @@ class RunProvider extends ChangeNotifier {
       maxStart = start;
       maxEnd = runs.length - 1;
     }
-    return runs[maxStart].date;
+    return runs[maxEnd].date; // Return the end of the streak
   }
 
   Future<void> ensureAthleteId() async {

@@ -13,8 +13,22 @@ class StreakScreen extends StatelessWidget {
     final currentStreak = runProvider.currentStreak;
     final totalKm = runProvider.totalKm;
     final avgKmPerDay = runProvider.avgKmPerDay;
-    final firstDay = runProvider.firstDay;
-    final lastDay = runProvider.runs.isNotEmpty ? runProvider.runs.first.date : null;
+    
+    // Get longest streak specific data
+    final longestStreakFirstDay = runProvider.longestStreakFirstDay;
+    final longestStreakLastDay = runProvider.longestStreakLastDay;
+    final longestStreakRuns = runProvider.sortedQualifiedRuns;
+    
+    // Calculate longest streak total km and average
+    double longestStreakTotalKm = 0.0;
+    if (longestStreakFirstDay != null && longestStreakLastDay != null) {
+      final streakRuns = longestStreakRuns.where((run) => 
+        run.date.isAfter(longestStreakFirstDay.subtract(const Duration(days: 1))) &&
+        run.date.isBefore(longestStreakLastDay.add(const Duration(days: 1)))
+      ).toList();
+      longestStreakTotalKm = streakRuns.fold(0.0, (sum, run) => sum + run.distanceKm);
+    }
+    final longestStreakAvgKm = longestStreak > 0 ? longestStreakTotalKm / longestStreak : 0.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFF181A20),
@@ -64,10 +78,10 @@ class StreakScreen extends StatelessWidget {
                   const SizedBox(height: 32),
                   _buildStreakTable([
                     ['Days', longestStreak],
-                    ['From', firstDay != null ? DateFormat.yMMMd().format(firstDay) : '-'],
-                    ['To', lastDay != null ? DateFormat.yMMMd().format(lastDay) : '-'],
-                    ['Total km', totalKm.toStringAsFixed(2)],
-                    ['Avg km/day', avgKmPerDay.toStringAsFixed(2)],
+                    ['From', longestStreakFirstDay != null ? DateFormat.yMMMd().format(longestStreakFirstDay) : '-'],
+                    ['To', longestStreakLastDay != null ? DateFormat.yMMMd().format(longestStreakLastDay) : '-'],
+                    ['Total km', longestStreakTotalKm.toStringAsFixed(2)],
+                    ['Avg km/day', longestStreakAvgKm.toStringAsFixed(2)],
                   ]),
                 ],
               ),
