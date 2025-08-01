@@ -175,6 +175,7 @@ class RunProvider extends ChangeNotifier {
   }
 
   Future<void> loadRuns() async {
+    print('[RunProvider] loadRuns() called');
     await ensureAthleteId();
     
     // If no athlete ID from Strava, try to load from local storage
@@ -183,19 +184,19 @@ class RunProvider extends ChangeNotifier {
       _athleteId = prefs.getString('strava_athlete_id');
       
       if (_athleteId != null) {
-        // ignore: avoid_print
         print('[RunProvider] Using stored athlete ID: $_athleteId');
       } else {
+        print('[RunProvider] No stored athlete ID found');
         // No stored athlete ID - don't load any data
         _activities = [];
         notifyListeners();
         return;
       }
     } else {
-      // ignore: avoid_print
       print('[RunProvider] Using Strava athlete ID: $_athleteId');
     }
     
+    print('[RunProvider] Loading runs for athlete: $_athleteId');
     await _loadRunsForAthlete(_athleteId!);
   }
 
@@ -204,7 +205,9 @@ class RunProvider extends ChangeNotifier {
   }
 
   Future<void> _loadRunsForAthlete(String athleteId) async {
+    print('[RunProvider] _loadRunsForAthlete called with athleteId: $athleteId');
     if (athleteId.isEmpty) {
+      print('[RunProvider] Empty athleteId, clearing activities');
       _activities = [];
       notifyListeners();
       return;
@@ -213,13 +216,16 @@ class RunProvider extends ChangeNotifier {
     _isSyncingCloud = true;
     notifyListeners();
     try {
+      print('[RunProvider] Fetching activities from Supabase...');
       // Fetch from Supabase
       final cloudActivities = await _supabaseService.fetchActivities(athleteId);
-      // ignore: avoid_print
       print('[RunProvider] Loaded ${cloudActivities.length} activities from Supabase for athlete $athleteId');
       // Optionally merge with local
       _activities = cloudActivities;
       await _storageService.saveActivities(athleteId, _activities);
+      print('[RunProvider] Activities saved to local storage');
+    } catch (e) {
+      print('[RunProvider] Error loading runs for athlete $athleteId: $e');
     } finally {
       _isSyncingCloud = false;
       notifyListeners();

@@ -34,16 +34,20 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isCheckingAuth = true);
 
     try {
+      print('[HomeScreen] Starting authentication check...');
       final runProvider = Provider.of<RunProvider>(context, listen: false);
       final stravaService = StravaService();
       
       // Check if there's a stored athlete ID
       final prefs = await SharedPreferences.getInstance();
       final storedAthleteId = prefs.getString('strava_athlete_id');
+      print('[HomeScreen] Stored athlete ID: $storedAthleteId');
       
       if (storedAthleteId != null && storedAthleteId.isNotEmpty) {
+        print('[HomeScreen] Found stored athlete ID, loading from database...');
         // We have a stored ID - load existing data from database
         await runProvider.loadRuns();
+        print('[HomeScreen] Loaded ${runProvider.activities.length} activities from database');
         
         // Refresh location provider after runs are loaded
         final locationProvider = Provider.of<LocationProvider>(context, listen: false);
@@ -51,15 +55,21 @@ class _HomeScreenState extends State<HomeScreen> {
         
         // Check if we have valid OAuth tokens to fetch new activities
         final accessToken = await stravaService.getValidAccessToken();
+        print('[HomeScreen] Access token check: ${accessToken != null ? "Valid" : "Invalid/None"}');
         if (accessToken != null && !accessToken.startsWith('Error:')) {
+          print('[HomeScreen] Valid OAuth found, syncing new activities...');
           // We have valid OAuth - check for new activities
           await _syncNewActivitiesFromStrava();
+        } else {
+          print('[HomeScreen] No valid OAuth, skipping Strava sync');
         }
       } else {
+        print('[HomeScreen] No stored athlete ID found');
         // No stored ID - user needs to connect to Strava first
         // Don't auto-load anything, show the connect button
       }
     } catch (e) {
+      print('[HomeScreen] Error during authentication check: $e');
       // Handle any errors silently
     } finally {
       if (mounted) {
@@ -70,13 +80,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _syncNewActivitiesFromStrava() async {
     try {
+      print('[HomeScreen] Starting Strava sync...');
       final runProvider = Provider.of<RunProvider>(context, listen: false);
       await runProvider.importFromStrava();
+      print('[HomeScreen] Strava sync completed, now have ${runProvider.activities.length} activities');
       
       // Refresh location provider after new activities are loaded
       final locationProvider = Provider.of<LocationProvider>(context, listen: false);
       await locationProvider.refresh();
+      print('[HomeScreen] Location provider refreshed');
     } catch (e) {
+      print('[HomeScreen] Error during Strava sync: $e');
       // Handle sync errors silently
     }
   }
