@@ -111,7 +111,7 @@
     },
     {
       "name": "file_picker",
-      "rootUri": "file:///Users/germainmachleidt/.pub-cache/hosted/pub.dev/file_picker-10.2.0",
+      "rootUri": "file:///Users/germainmachleidt/.pub-cache/hosted/pub.dev/file_picker-10.2.1",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
@@ -663,7 +663,7 @@
     },
     {
       "name": "webview_flutter_platform_interface",
-      "rootUri": "file:///Users/germainmachleidt/.pub-cache/hosted/pub.dev/webview_flutter_platform_interface-2.13.1",
+      "rootUri": "file:///Users/germainmachleidt/.pub-cache/hosted/pub.dev/webview_flutter_platform_interface-2.14.0",
       "packageUri": "lib/",
       "languageVersion": "3.6"
     },
