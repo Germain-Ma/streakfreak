@@ -149,9 +149,14 @@ class _StravaWebViewScreenState extends State<StravaWebViewScreen> {
               _gps = gpsCount;
             });
             
-            if (widget.onImportComplete != null) {
-              widget.onImportComplete!();
-            }
+                      if (widget.onImportComplete != null) {
+            widget.onImportComplete!();
+          }
+          
+          // Return true to indicate successful import
+          if (mounted) {
+            Navigator.of(context).pop(true);
+          }
           } else {
             // No activities were imported
             setState(() => _isLoading = false);

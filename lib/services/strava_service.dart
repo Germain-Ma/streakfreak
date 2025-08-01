@@ -31,33 +31,43 @@ class StravaService {
   }
 
   Future<String?> exchangeCodeForToken(String code) async {
-    final response = await http.post(
-      Uri.parse(tokenUrl),
-      body: {
-        'client_id': clientId,
-        'client_secret': clientSecret,
-        'code': code,
-        'grant_type': 'authorization_code',
-        'redirect_uri': _effectiveRedirectUri,
-      },
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(tokenUrl),
+        body: {
+          'client_id': clientId,
+          'client_secret': clientSecret,
+          'code': code,
+          'grant_type': 'authorization_code',
+          'redirect_uri': _effectiveRedirectUri,
+        },
+      );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('strava_access_token', data['access_token']);
-      await prefs.setString('strava_refresh_token', data['refresh_token']);
-      await prefs.setInt('strava_token_expires_at', data['expires_at']);
-      // Fetch and store athlete ID after successful token exchange
-      await fetchAndStoreAthleteId();
-      return data['access_token'];
-    } else {
-      try {
-        final error = jsonDecode(response.body);
-        return 'Error: ${error['message'] ?? response.body}';
-      } catch (_) {
-        return 'Error: ${response.body}';
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('strava_access_token', data['access_token']);
+        await prefs.setString('strava_refresh_token', data['refresh_token']);
+        await prefs.setInt('strava_token_expires_at', data['expires_at']);
+        // Fetch and store athlete ID after successful token exchange
+        await fetchAndStoreAthleteId();
+        return data['access_token'];
+      } else {
+        // Log the error details for debugging
+        print('Strava token exchange failed: ${response.statusCode}');
+        print('Response body: ${response.body}');
+        print('Request redirect_uri: $_effectiveRedirectUri');
+        
+        try {
+          final error = jsonDecode(response.body);
+          return 'Error: ${error['message'] ?? response.body}';
+        } catch (_) {
+          return 'Error: ${response.body}';
+        }
       }
+    } catch (e) {
+      print('Exception during token exchange: $e');
+      return 'Error: $e';
     }
   }
 

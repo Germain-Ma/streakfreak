@@ -7,6 +7,7 @@ import '../providers/run_provider.dart';
 import '../providers/location_provider.dart';
 import 'strava_webview_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/strava_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,28 +18,89 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  bool _isCheckingAuth = false;
 
   @override
   void initState() {
     super.initState();
-    // Only auto-load if there's a valid stored athlete ID
+    // Check authentication and data on app start
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkAuthenticationAndData();
+    });
+  }
+
+  Future<void> _checkAuthenticationAndData() async {
+    if (_isCheckingAuth) return;
+    setState(() => _isCheckingAuth = true);
+
+    try {
       final runProvider = Provider.of<RunProvider>(context, listen: false);
+      final stravaService = StravaService();
       
       // Check if there's a stored athlete ID
       final prefs = await SharedPreferences.getInstance();
       final storedAthleteId = prefs.getString('strava_athlete_id');
       
       if (storedAthleteId != null && storedAthleteId.isNotEmpty) {
-        // Auto-load for returning users with valid stored ID
+        // We have a stored ID - load existing data from database
         await runProvider.loadRuns();
         
         // Refresh location provider after runs are loaded
         final locationProvider = Provider.of<LocationProvider>(context, listen: false);
         await locationProvider.refresh();
+        
+        // Check if we have valid OAuth tokens to fetch new activities
+        final accessToken = await stravaService.getValidAccessToken();
+        if (accessToken != null && !accessToken.startsWith('Error:')) {
+          // We have valid OAuth - check for new activities
+          await _syncNewActivitiesFromStrava();
+        }
+      } else {
+        // No stored ID - user needs to connect to Strava first
+        // Don't auto-load anything, show the connect button
       }
-      // If no stored athlete ID, show clean interface for new users
-    });
+    } catch (e) {
+      // Handle any errors silently
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingAuth = false);
+      }
+    }
+  }
+
+  Future<void> _syncNewActivitiesFromStrava() async {
+    try {
+      final runProvider = Provider.of<RunProvider>(context, listen: false);
+      await runProvider.importFromStrava();
+      
+      // Refresh location provider after new activities are loaded
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      await locationProvider.refresh();
+    } catch (e) {
+      // Handle sync errors silently
+    }
+  }
+
+  Future<void> _connectToStrava() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StravaWebViewScreen(
+          onImportComplete: _onImportComplete,
+        ),
+      ),
+    );
+    
+    // After OAuth, check authentication and data again
+    if (result == true) {
+      await _checkAuthenticationAndData();
+    }
+  }
+
+  void _onImportComplete() {
+    // The RunProvider will have been updated by the StravaWebViewScreen
+    // Refresh the UI
+    setState(() {});
   }
 
   static const List<Widget> _tabs = <Widget>[
@@ -51,11 +113,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedIndex = index;
     });
-  }
-
-  void _onImportComplete() {
-    // The RunProvider will have been updated by the StravaWebViewScreen
-    // No need to do anything else here
   }
 
   @override
@@ -76,8 +133,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
               ),
             ),
-            // Connect Strava button if no activities
-            if (runProvider.activities.isEmpty)
+            // Sync button if we have activities and valid OAuth
+            if (runProvider.activities.isNotEmpty && !_isCheckingAuth)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton(
+                  onPressed: _syncNewActivitiesFromStrava,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                  child: const Text(
+                    'Sync New Activities from Strava',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            // Connect Strava button if no activities or checking auth
+            if (runProvider.activities.isEmpty || _isCheckingAuth)
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -87,33 +161,41 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Connect your Strava account to start tracking your running streaks.',
-                      style: TextStyle(fontSize: 16, color: Colors.white70),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => StravaWebViewScreen(
-                              onImportComplete: _onImportComplete,
+                    if (_isCheckingAuth)
+                      const Column(
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text(
+                            'Checking authentication and loading data...',
+                            style: TextStyle(fontSize: 16, color: Colors.white70),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      )
+                    else
+                      Column(
+                        children: [
+                          const Text(
+                            'Connect your Strava account to start tracking your running streaks.',
+                            style: TextStyle(fontSize: 16, color: Colors.white70),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton(
+                            onPressed: _connectToStrava,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            ),
+                            child: const Text(
+                              'Connect to Strava',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                        ],
                       ),
-                      child: const Text(
-                        'Connect to Strava',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ),
                     const SizedBox(height: 16),
                     // Debug button to clear stored athlete ID
                     ElevatedButton(
